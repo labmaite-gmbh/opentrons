@@ -40,6 +40,7 @@ from opentrons.drivers.smoothie_drivers.constants import (
     UNSTICK_SPEED,
     DEFAULT_AXES_SPEED,
     XY_HOMING_SPEED,
+    PROBE_INSTRUMENT_SPEED,
     HOME_SEQUENCE,
     AXES,
     DISABLE_AXES,
@@ -1704,6 +1705,7 @@ class SmoothieDriver:
     async def probe_axis(self, axis: str, probing_distance: float) -> Dict[str, float]:
         if axis.upper() in AXES:
             self.engaged_axes[axis] = True
+            # FIXME: (andy) there should be some setting of dwelling/active axis here...
             command = (
                 _command_builder()
                 .add_gcode(gcode=GCODE.PROBE)
@@ -1730,6 +1732,41 @@ class SmoothieDriver:
             return self.position
         else:
             raise RuntimeError(f"Cant probe axis {axis}")
+
+    async def probe_instrument(self, instrument: str, axis: str, probing_distance: float) -> Dict[str, float]:
+        axis = axis.upper()
+        if axis not in AXES:
+            raise RuntimeError(f"Cant probe-with-instrument on axis {axis}")
+        instrument = instrument.upper()
+        if instrument not in ['L', 'R']:
+            raise RuntimeError(f"Cant probe-with-instrument using side {instrument}, must be L or R")
+        self.engaged_axes[axis] = True
+        self.activate_axes(axis)
+        self.dwell_axes("".join([
+            ax for ax in AXES if ax.upper() is not axis
+        ]))
+        self.push_axis_max_speed()
+        await self.set_axis_max_speed({axis: PROBE_INSTRUMENT_SPEED})
+        command = (
+            _command_builder()
+            .add_gcode(gcode=GCODE.PROBE_INSTRUMENT)
+            .add_float(prefix=axis, value=probing_distance, precision=None)
+            .add_element(instrument)
+        )
+        log.debug(f"probe_with_instrument: {command}")
+        try:
+            await self._send_command(
+                command=command,
+                ack_timeout=DEFAULT_MOVEMENT_TIMEOUT,
+                suppress_home_after_error=True,
+            )
+        except SmoothieError:
+            log.exception("probe_with_instrument failure")
+            raise
+        finally:
+            await self.pop_axis_max_speed()
+        await self.update_position(self.position)
+        return self.position
 
     def turn_on_blue_button_light(self) -> None:
         self._gpio_chardev.set_button_light(blue=True)

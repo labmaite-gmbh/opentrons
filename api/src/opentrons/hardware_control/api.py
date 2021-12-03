@@ -378,6 +378,19 @@ class API(HardwareAPILike):
         """
         return await self._backend.limit_switch_state()
 
+    async def probe_instrument(self, mount: top_types.Mount, axis: Axis, distance: float) -> Dict[Axis, float]:
+        """Run a probing sequence on the selected axis, listening for the passed instrument's limit switch to trigger
+
+        The movement will immediately stop when the limit switch is triggered.
+
+        Returns the current position of the stopped robot
+
+        """
+        self._current_position = self._deck_from_smoothie(
+            await self._backend.probe_instrument(mount, axis, distance)
+        )
+        return self._current_position.copy()
+
     async def identify(self, duration_s: int = 5):
         """Blink the button light to identify the robot.
 
