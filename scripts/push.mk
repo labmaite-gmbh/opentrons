@@ -1,7 +1,7 @@
 # utilities for pushing things to robots in a reusable fashion
 
 find_robot=$(shell yarn run -s discovery find -i 169.254)
-default_ssh_key := ~/.ssh/robot_key
+default_ssh_key := $(OTKEY) # DO NOT COMMIT
 default_ssh_opts := -o stricthostkeychecking=no -o userknownhostsfile=/dev/null
 
 # push-python-package: execute a push to the robot of a particular python

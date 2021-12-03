@@ -47,16 +47,19 @@ br_ssh_key ?= $(default_ssh_key)
 # Other SSH args for buildroot robots
 ssh_opts ?= $(default_ssh_opts)
 
+# DO NOT COMMIT
+host ?= $(OTIP)
+
 twine_auth_args := --username $(pypi_username) --password $(pypi_password)
 twine_repository_url ?= $(pypi_test_upload_url)
 
 # Source discovery
 # For the python sources
-ot_py_sources := $(filter %.py,$(shell $(SHX) find src/opentrons/))
+ot_py_sources := $(filter %.py,$(shell $(SHX) find src/opentrons/)) 				# SLOW
 # And the out of tree shared data
-ot_shared_data_sources := $(filter %.json,$(shell $(SHX) find ../shared-data/))
+ot_shared_data_sources := $(filter %.json,$(shell $(SHX) find ../shared-data/))		# SLOW
 # And the arbitrary stuff in resources
-ot_resources := $(filter %,$(shell $(SHX) find src/opentrons/resources))
+ot_resources := $(filter %,$(shell $(SHX) find src/opentrons/resources))			# SLOW
 ot_sources := $(ot_py_sources) $(ot_shared_data_sources) $(ot_resources)
 
 # Defined separately than the clean target so the wheel file doesn’t have to
@@ -87,7 +90,7 @@ $(wheel_file): setup.py $(ot_sources)
 	$(SHX) rm -rf build
 	$(SHX) ls dist
 
-wheel: $(wheel_file)
+wheel: $(wheel_file)								# SLOW
 
 $(sdist_file): setup.py $(ot_sources)
 	$(clean_cmd)
@@ -95,7 +98,7 @@ $(sdist_file): setup.py $(ot_sources)
 	$(SHX) rm -rf build
 	$(SHX) ls dist
 
-sdist: $(sdist_file)
+# sdist: $(sdist_file) # DO NOT COMMIT
 
 .PHONY: test
 test:
@@ -170,6 +173,10 @@ push-no-restart: wheel
 push: push-no-restart
 	$(call restart-service,$(host),$(br_ssh_key),$(ssh_opts),"jupyter-notebook opentrons-robot-server")
 
+.PHONY: restart
+restart:
+	$(call restart-service,$(host),$(br_ssh_key),$(ssh_opts),"jupyter-notebook opentrons-robot-server")
+
 .PHONY: push-no-restart-ot3
 push-no-restart-ot3: $(sdist_file)
 	echo $(sdist_file)
@@ -192,10 +199,18 @@ emulator:
 deploy: wheel
 	$(call python_upload_package,$(twine_auth_args),$(twine_repository_url),$(wheel_file))
 
+.PHONY: find
+find:
+	$(find_robot)
+
 # User must currently specify host, e.g.: `make term host=169.254.202.176`
 .PHONY: term
 term:
 	ssh -i $(br_ssh_key) $(ssh_opts) root@$(host)
+
+.PHONY: jupyter
+jupyter:
+	cmd /c start http://$(host):48888/
 
 .PHONY: plot-session
 plot-session:
