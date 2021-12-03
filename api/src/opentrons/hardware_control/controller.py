@@ -127,6 +127,9 @@ class Controller:
                 return False
         return True
 
+    async def limit_switch_state(self) -> Dict[str, bool]:
+        return await self._smoothie_driver.switch_state()
+
     async def move(
         self,
         target_position: Dict[str, float],

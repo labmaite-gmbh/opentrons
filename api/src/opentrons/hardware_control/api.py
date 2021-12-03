@@ -371,6 +371,13 @@ class API(HardwareAPILike):
         """
         return self._backend.get_lights()
 
+    async def get_limit_switch_state(self) -> Dict[str, bool]:
+        """Return the current state of all the robot limit switches.
+
+        :returns: A dict of the switches: `{'X': bool, 'Y': bool, 'Z': bool, 'A': bool, 'B': bool, 'C': bool}`
+        """
+        return await self._backend.limit_switch_state()
+
     async def identify(self, duration_s: int = 5):
         """Blink the button light to identify the robot.
 
