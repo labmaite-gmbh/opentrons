@@ -165,6 +165,11 @@ dev:
 local-shell:
 	$(pipenv) shell
 
+.PHONY: activate
+activate:
+	$(call echo "Activating virtual environment")
+	$(call OTENV_ACTIVATE)
+
 .PHONY: push-no-restart
 push-no-restart: wheel
 	$(call push-python-package,$(host),$(br_ssh_key),$(ssh_opts),$(wheel_file))
@@ -176,6 +181,10 @@ push: push-no-restart
 .PHONY: restart
 restart:
 	$(call restart-service,$(host),$(br_ssh_key),$(ssh_opts),"jupyter-notebook opentrons-robot-server")
+
+.PHONY: stop-server
+stop-server:
+	$(call stop-service,$(host),$(br_ssh_key),$(ssh_opts),"opentrons-robot-server")
 
 .PHONY: push-no-restart-ot3
 push-no-restart-ot3: $(sdist_file)
@@ -207,6 +216,14 @@ find:
 .PHONY: term
 term:
 	ssh -i $(br_ssh_key) $(ssh_opts) root@$(host)
+
+.PHONE: push-file
+push-file:
+	scp -i $(br_ssh_key) $(ssh_opts) $(file_path) root@$(host):/data/user_storage/$(file_name)
+
+.PHONE: push-folder
+push-folder:
+	scp -r $(file_path) root@$(host):/data/user_storage
 
 .PHONY: jupyter
 jupyter:

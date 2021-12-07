@@ -54,6 +54,11 @@ ssh -i "$(2)" $(3)  root@$(1) \
 "systemctl restart $(4)"
 endef
 
+define stop-service
+ssh -i "$(2)" $(3)  root@$(1) \
+"systemctl stop $(4)"
+endef
+
 # push-systemd-unit: move a systemd unit file to the robot
 # 
 # argument 1 is the host to push to
