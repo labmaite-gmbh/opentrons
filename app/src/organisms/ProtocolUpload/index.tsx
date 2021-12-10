@@ -53,6 +53,7 @@ export function ProtocolUpload(): JSX.Element {
     isCreatingProtocolRun,
   } = useCurrentProtocolRun()
 
+  const { isLoading: isStopping } = useStopRunMutation()
   const { closeCurrentRun, isProtocolRunLoaded } = useCloseCurrentRun()
   const robotName = useSelector((state: State) => getConnectedRobotName(state))
   const customLabwareFiles = useSelector((state: State) =>
@@ -114,7 +115,7 @@ export function ProtocolUpload(): JSX.Element {
     cancel: cancelExit,
   } = useConditionalConfirm(handleCloseProtocol, true)
 
-  const titleBarProps = isProtocolRunLoaded
+  const titleBarProps = !isStopping && isProtocolRunLoaded
     ? {
         title: t('protocol_title', {
           protocol_name: protocolRecord?.data?.metadata?.protocolName ?? '',
@@ -133,7 +134,7 @@ export function ProtocolUpload(): JSX.Element {
         ),
       }
 
-  const pageContents = isProtocolRunLoaded ? (
+  const pageContents = !isStopping && isProtocolRunLoaded ? (
     <ProtocolSetup />
   ) : (
     <UploadInput onUpload={handleUpload} />

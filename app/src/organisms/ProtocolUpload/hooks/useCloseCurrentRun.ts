@@ -34,7 +34,7 @@ export function useCloseCurrentRun(): {
   } = useDismissCurrentRunMutation()
   const { protocolRecord, runRecord } = useCurrentProtocolRun()
 
-  const { stopRun } = useStopRunMutation()
+  const { stopRun, isLoading: isStopping } = useStopRunMutation()
   const { deleteRun } = useDeleteRunMutation()
 
   const closeCurrentRun = (
