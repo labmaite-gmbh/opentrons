@@ -1,5 +1,7 @@
 import dropWhile from 'lodash/dropWhile'
 import * as React from 'react'
+import { FixedSizeList } from 'react-window'
+import AutoSizer from 'react-virtualized-auto-sizer'
 import { useTranslation } from 'react-i18next'
 import {
   Flex,
@@ -32,6 +34,8 @@ import type {
   CommandStatus,
 } from '@opentrons/shared-data'
 import type { RunCommandSummary } from '@opentrons/api-client'
+import type { } from 'react-window`'
+
 
 export function CommandList(): JSX.Element | null {
   const { t } = useTranslation('run_details')
@@ -241,57 +245,63 @@ export function CommandList(): JSX.Element | null {
           </Flex>
         )}
 
-        <Flex
+        <Box
           fontSize={FONT_SIZE_CAPTION}
           color={C_MED_DARK_GRAY}
           flexDirection={DIRECTION_COLUMN}
+          height="96vh"
+          width="100%"
         >
-          <Flex flexDirection={DIRECTION_COLUMN}>
-            {currentCommandList?.map((command, index) => {
-              const showAnticipatedStepsTitle =
-                (index === 0 && runDataCommands?.length === 0) ||
-                (index > 0 &&
-                  currentCommandList[index - 1].runCommandSummary?.status ===
-                    'running')
-
-              return (
-                <Flex
-                  key={
-                    command.analysisCommand?.id ?? command.runCommandSummary?.id
-                  }
-                  id={`RunDetails_CommandItem`}
-                  paddingLeft={SPACING_1}
-                  justifyContent={JUSTIFY_START}
-                  flexDirection={DIRECTION_COLUMN}
-                  flex={'auto'}
+          <AutoSizer>
+            {
+              ({height, width}: {height: number, width: number}) =>
+              <Flex flexDirection={DIRECTION_COLUMN} marginX={SPACING_2}>
+                <FixedSizeList
+                  height={height}
+                  width={width}
+                  itemCount={currentCommandList.length}
+                  itemData={{
+                    currentCommandList,
+                    runStatus,
+                  }}
+                  itemSize={60}
                 >
-                  {showAnticipatedStepsTitle && (
-                    <Flex
-                      fontSize={FONT_SIZE_CAPTION}
-                      marginLeft={SPACING_2}
-                      paddingBottom={SPACING_1}
-                    >
-                      {t('anticipated')}
-                    </Flex>
-                  )}
-                  <Flex
-                    padding={`${SPACING_1} ${SPACING_2} ${SPACING_1} ${SPACING_2}`}
-                    flexDirection={DIRECTION_COLUMN}
-                    flex={'auto'}
-                  >
-                    <CommandItem
-                      analysisCommand={command.analysisCommand}
-                      runCommandSummary={command.runCommandSummary}
-                      runStatus={runStatus}
-                    />
-                  </Flex>
-                </Flex>
-              )
-            })}
-          </Flex>
-          <Flex padding={SPACING_1}>{t('end_of_protocol')}</Flex>
-        </Flex>
+                  {CommandRow}
+                </FixedSizeList>
+                <Flex padding={SPACING_1}>{t('end_of_protocol')}</Flex>
+              </Flex>
+            }
+          </AutoSizer>
+        </Box>
       </Flex>
     </React.Fragment>
+  )
+}
+
+function CommandRow(props: any) {
+  const {index, style, data} = props
+  const {currentCommandList, runStatus } = data
+  const showAnticipatedStepsTitle =
+    (index === 0 && currentCommandList[0]?.runCommandSummary == null) ||
+    (index > 0 &&
+      currentCommandList[index - 1].runCommandSummary?.status ===
+        'running')
+  const {analysisCommand , runCommandSummary} = currentCommandList[index]
+  return (
+    <Flex
+      key={ analysisCommand?.id ?? runCommandSummary?.id }
+      id={`RunDetails_CommandItem`}
+      paddingLeft={SPACING_1}
+      justifyContent={JUSTIFY_START}
+      flexDirection={DIRECTION_COLUMN}
+      style={style}
+    >
+      <CommandItem
+        analysisCommand={analysisCommand}
+        runCommandSummary={runCommandSummary}
+        runStatus={runStatus}
+        showAnticipatedStepsTitle={showAnticipatedStepsTitle}
+      />
+    </Flex>
   )
 }

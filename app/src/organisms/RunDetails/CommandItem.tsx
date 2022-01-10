@@ -46,6 +46,7 @@ export interface CommandItemProps {
   analysisCommand: Command | null
   runCommandSummary: RunCommandSummary | null
   runStatus?: RunStatus
+  showAnticipatedStepsTitle: boolean
 }
 
 const WRAPPER_STYLE_BY_STATUS: {
@@ -73,7 +74,8 @@ const commandIsComplete = (status: RunCommandSummary['status']): boolean =>
 export const OBSERVER_DELAY = 300
 
 function CommandItemComponent(props: CommandItemProps): JSX.Element | null {
-  const { analysisCommand, runCommandSummary, runStatus } = props
+  const { analysisCommand, runCommandSummary, runStatus, showAnticipatedStepsTitle } = props
+  console.log(analysisCommand)
   const { t } = useTranslation('run_details')
   const currentRunId = useCurrentRunId()
   const [commandItemRef, isInView] = useInView({
@@ -142,57 +144,69 @@ function CommandItemComponent(props: CommandItemProps): JSX.Element | null {
     background-color: ${WRAPPER_STYLE_BY_STATUS[commandStatus].backgroundColor};
     border: ${WRAPPER_STYLE_BY_STATUS[commandStatus].border};
     padding: ${SPACING_2};
+    margin: ${SPACING_1} 0;
     color: ${C_DARK_GRAY};
     flex-direction: ${DIRECTION_COLUMN};
   `
   return (
-    <Flex css={WRAPPER_STYLE} ref={commandItemRef}>
-      {commandStatus === 'running' ? (
-        <CurrentCommandLabel runStatus={runStatus} />
-      ) : null}
-      {commandStatus === 'failed' ? <CommandFailedMessage /> : null}
-      {isComment ? (
+    <>
+      {showAnticipatedStepsTitle && (
         <Flex
-          textTransform={TEXT_TRANSFORM_UPPERCASE}
           fontSize={FONT_SIZE_CAPTION}
-          color={C_MED_DARK_GRAY}
-          marginBottom={SPACING_1}
-          marginLeft={SPACING_1}
+          marginLeft={SPACING_2}
+          paddingBottom={SPACING_1}
         >
-          {t('comment_step')}
+          {t('anticipated')}
         </Flex>
-      ) : null}
-      {isPause ? (
-        <Flex
-          textTransform={TEXT_TRANSFORM_UPPERCASE}
-          fontSize={FONT_SIZE_CAPTION}
-          color={C_MED_DARK_GRAY}
-          marginBottom={SPACING_1}
-          marginLeft={SPACING_1}
-        >
-          <Icon
-            name="pause"
-            width={SPACING_3}
-            paddingRight={SPACING_2}
-            color={C_DARK_GRAY}
-          />
-          {t('pause_protocol')}
-        </Flex>
-      ) : null}
-      <Flex flexDirection={DIRECTION_ROW}>
-        {['running', 'failed', 'succeeded'].includes(commandStatus) &&
-        !isComment ? (
-          <CommandTimer
-            commandStartedAt={commandDetails?.data.startedAt}
-            commandCompletedAt={commandDetails?.data.completedAt}
-          />
+      )}
+      <Flex css={WRAPPER_STYLE} ref={commandItemRef}>
+        {/* {commandStatus === 'running' ? (
+          <CurrentCommandLabel runStatus={runStatus} />
+        ) : null} */}
+        {commandStatus === 'failed' ? <CommandFailedMessage /> : null}
+        {isComment ? (
+          <Flex
+            textTransform={TEXT_TRANSFORM_UPPERCASE}
+            fontSize={FONT_SIZE_CAPTION}
+            color={C_MED_DARK_GRAY}
+            marginBottom={SPACING_1}
+            marginLeft={SPACING_1}
+          >
+            {t('comment_step')}
+          </Flex>
         ) : null}
-        <CommandText
-          analysisCommand={analysisCommand}
-          runCommand={commandDetails?.data ?? null}
-        />
+        {isPause ? (
+          <Flex
+            textTransform={TEXT_TRANSFORM_UPPERCASE}
+            fontSize={FONT_SIZE_CAPTION}
+            color={C_MED_DARK_GRAY}
+            marginBottom={SPACING_1}
+            marginLeft={SPACING_1}
+          >
+            <Icon
+              name="pause"
+              width={SPACING_3}
+              paddingRight={SPACING_2}
+              color={C_DARK_GRAY}
+            />
+            {t('pause_protocol')}
+          </Flex>
+        ) : null}
+        <Flex flexDirection={DIRECTION_ROW}>
+          {['running', 'failed', 'succeeded'].includes(commandStatus) &&
+          !isComment ? (
+            <CommandTimer
+              commandStartedAt={commandDetails?.data.startedAt}
+              commandCompletedAt={commandDetails?.data.completedAt}
+            />
+          ) : null}
+          <CommandText
+            analysisCommand={analysisCommand}
+            runCommand={commandDetails?.data ?? null}
+          />
+        </Flex>
       </Flex>
-    </Flex>
+    </>
   )
 }
 
