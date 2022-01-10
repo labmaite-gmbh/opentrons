@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { useTranslation } from 'react-i18next'
 import { useInView } from 'react-intersection-observer'
+import isEqual from 'lodash/isEqual'
 import {
   DIRECTION_ROW,
   Flex,
@@ -71,7 +72,7 @@ const commandIsComplete = (status: RunCommandSummary['status']): boolean =>
 // minimum delay in MS for observer notifications
 export const OBSERVER_DELAY = 300
 
-export function CommandItem(props: CommandItemProps): JSX.Element | null {
+function CommandItemComponent(props: CommandItemProps): JSX.Element | null {
   const { analysisCommand, runCommandSummary, runStatus } = props
   const { t } = useTranslation('run_details')
   const currentRunId = useCurrentRunId()
@@ -195,6 +196,7 @@ export function CommandItem(props: CommandItemProps): JSX.Element | null {
   )
 }
 
+export const CommandItem = React.memo(CommandItemComponent, (prevProps, nextProps) => isEqual(prevProps, nextProps))
 interface CurrentCommandLabelProps {
   runStatus?: RunStatus
 }
