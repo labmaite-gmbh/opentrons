@@ -1,6 +1,6 @@
 import dropWhile from 'lodash/dropWhile'
 import * as React from 'react'
-import { FixedSizeList } from 'react-window'
+import { VariableSizeList } from 'react-window'
 import AutoSizer from 'react-virtualized-auto-sizer'
 import { useTranslation } from 'react-i18next'
 import {
@@ -34,15 +34,11 @@ import type {
   CommandStatus,
 } from '@opentrons/shared-data'
 import type { RunCommandSummary } from '@opentrons/api-client'
-import type { } from 'react-window`'
+import type { } from 'react-window'
 
 
 export function CommandList(): JSX.Element | null {
   const { t } = useTranslation('run_details')
-  const [
-    showProtocolSetupInfo,
-    setShowProtocolSetupInfo,
-  ] = React.useState<boolean>(false)
   const protocolData: ProtocolFile<{}> | null = useProtocolDetails()
     .protocolData
   const { runRecord } = useCurrentProtocolRun()
@@ -167,84 +163,27 @@ export function CommandList(): JSX.Element | null {
             />
           </Box>
         ) : null}
-        <Flex
+        <Text
           paddingLeft={SPACING_2}
           css={FONT_HEADER_DARK}
           textTransform={TEXT_TRANSFORM_CAPITALIZE}
         >
           {t('protocol_steps')}
-        </Flex>
-        {protocolSetupCommandList.length > 0 && (
-          <Flex margin={SPACING_1}>
-            {showProtocolSetupInfo ? (
-              <React.Fragment>
-                <Flex
-                  flexDirection={DIRECTION_COLUMN}
-                  flex={'auto'}
-                  backgroundColor={C_NEAR_WHITE}
-                  marginLeft={SPACING_2}
-                >
-                  <Flex
-                    justifyContent={JUSTIFY_SPACE_BETWEEN}
-                    color={C_MED_DARK_GRAY}
-                    padding={SPACING_2}
-                  >
-                    <Text
-                      textTransform={TEXT_TRANSFORM_UPPERCASE}
-                      fontSize={FONT_SIZE_CAPTION}
-                      id={`RunDetails_ProtocolSetupTitle`}
-                    >
-                      {t('protocol_setup')}
-                    </Text>
-                    <Btn
-                      size={SIZE_1}
-                      onClick={() => setShowProtocolSetupInfo(false)}
-                    >
-                      <Icon name="chevron-up" color={C_MED_DARK_GRAY}></Icon>
-                    </Btn>
-                  </Flex>
-                  <Flex
-                    id={`RunDetails_ProtocolSetup_CommandList`}
-                    flexDirection={DIRECTION_COLUMN}
-                    marginLeft={SPACING_1}
-                    paddingLeft={SPACING_2}
-                  >
-                    {protocolSetupCommandList?.map(command => {
-                      return (
-                        <ProtocolSetupInfo
-                          key={command.id}
-                          setupCommand={command as Command}
-                        />
-                      )
-                    })}
-                  </Flex>
-                </Flex>
-              </React.Fragment>
-            ) : (
-              <Btn
-                width={'100%'}
-                role={'link'}
-                onClick={() => setShowProtocolSetupInfo(true)}
-                margin={SPACING_1}
-              >
-                <Flex
-                  fontSize={FONT_SIZE_CAPTION}
-                  justifyContent={JUSTIFY_SPACE_BETWEEN}
-                  textTransform={TEXT_TRANSFORM_UPPERCASE}
-                  color={C_MED_DARK_GRAY}
-                  backgroundColor={C_NEAR_WHITE}
-                  marginLeft={SPACING_1}
-                >
-                  <Flex padding={SPACING_2}>{t('protocol_setup')}</Flex>
-                  <Flex>
-                    <Icon name={'chevron-left'} width={SIZE_1} />
-                  </Flex>
-                </Flex>
-              </Btn>
-            )}
-          </Flex>
-        )}
-
+        </Text>
+        <ProtocolSetup
+          setupCommands={protocolSetupCommandList}
+          setupStatus={protocolSetupCommandList.reduce((acc, setupCommand) => {
+            if (runDataCommands == null) {
+              return 'queued'
+            } else if (runDataCommands.find(runCommand => setupCommand.id === runCommand.id && runCommand.status === 'running')) {
+              return 'running'
+            } else if (runDataCommands.find(runCommand => setupCommand.id === runCommand.id && runCommand.status === 'failed')) {
+              return 'failed'
+            } else {
+              return  'succeeded'
+            }
+          }, 'queued')}
+          />
         <Box
           fontSize={FONT_SIZE_CAPTION}
           color={C_MED_DARK_GRAY}
@@ -256,7 +195,7 @@ export function CommandList(): JSX.Element | null {
             {
               ({height, width}: {height: number, width: number}) =>
               <Flex flexDirection={DIRECTION_COLUMN} marginX={SPACING_2}>
-                <FixedSizeList
+                <VariableSizeList
                   height={height}
                   width={width}
                   itemCount={currentCommandList.length}
@@ -264,10 +203,22 @@ export function CommandList(): JSX.Element | null {
                     currentCommandList,
                     runStatus,
                   }}
-                  itemSize={60}
+                  itemSize={(index: number) => {
+                    const { status } = currentCommandList[index].runCommandSummary ?? {}
+                    switch(status) {
+                      case 'running':
+                      case 'failed':
+                        return 100
+                      case 'succeeded':
+                        return 56
+                      case 'queued':
+                      default:
+                        return 40
+                    }
+                  }}
                 >
                   {CommandRow}
-                </FixedSizeList>
+                </VariableSizeList>
                 <Flex padding={SPACING_1}>{t('end_of_protocol')}</Flex>
               </Flex>
             }
@@ -303,5 +254,85 @@ function CommandRow(props: any) {
         showAnticipatedStepsTitle={showAnticipatedStepsTitle}
       />
     </Flex>
+  )
+}
+
+interface ProtocolSetupProps {
+  setupCommands: Command[]
+  setupStatus: CommandStatus
+}
+function ProtocolSetup(props: ProtocolSetupProps) {
+  const {setupCommands} = props
+  const [
+    showProtocolSetupInfo,
+    setShowProtocolSetupInfo,
+  ] = React.useState<boolean>(false)
+  const { t } = useTranslation('run_details')
+
+  if (setupCommands.length <= 0) return null
+
+  return (
+    <Flex margin={SPACING_1}>
+      {showProtocolSetupInfo ? (
+        <React.Fragment>
+          <Flex
+            flexDirection={DIRECTION_COLUMN}
+            backgroundColor={C_NEAR_WHITE}
+            marginLeft={SPACING_2}
+          >
+            <Flex
+              justifyContent={JUSTIFY_SPACE_BETWEEN}
+              color={C_MED_DARK_GRAY}
+              padding={SPACING_2}
+            >
+              <Text
+                textTransform={TEXT_TRANSFORM_UPPERCASE}
+                fontSize={FONT_SIZE_CAPTION}
+                id={`RunDetails_ProtocolSetupTitle`}
+              >
+                {t('protocol_setup')}
+              </Text>
+              <Btn
+                size={SIZE_1}
+                onClick={() => setShowProtocolSetupInfo(false)}
+              >
+                <Icon name="chevron-up" color={C_MED_DARK_GRAY}></Icon>
+              </Btn>
+            </Flex>
+            <Flex
+              id={`RunDetails_ProtocolSetup_CommandList`}
+              flexDirection={DIRECTION_COLUMN}
+              marginLeft={SPACING_1}
+              paddingLeft={SPACING_2}
+            >
+              {setupCommands.map(command => (
+                <ProtocolSetupInfo key={command.id} setupCommand={command} />
+              ))}
+            </Flex>
+          </Flex>
+        </React.Fragment>
+      ) : (
+        <Btn
+          width={'100%'}
+          role={'link'}
+          onClick={() => setShowProtocolSetupInfo(true)}
+          margin={SPACING_1}
+        >
+          <Flex
+            fontSize={FONT_SIZE_CAPTION}
+            justifyContent={JUSTIFY_SPACE_BETWEEN}
+            textTransform={TEXT_TRANSFORM_UPPERCASE}
+            color={C_MED_DARK_GRAY}
+            backgroundColor={C_NEAR_WHITE}
+            marginLeft={SPACING_1}
+          >
+            <Flex padding={SPACING_2}>{t('protocol_setup')}</Flex>
+            <Flex>
+              <Icon name={'chevron-left'} width={SIZE_1} />
+            </Flex>
+          </Flex>
+        </Btn>
+      )}
+      </Flex>
   )
 }

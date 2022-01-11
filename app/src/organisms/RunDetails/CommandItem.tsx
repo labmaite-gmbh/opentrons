@@ -75,7 +75,6 @@ export const OBSERVER_DELAY = 300
 
 function CommandItemComponent(props: CommandItemProps): JSX.Element | null {
   const { analysisCommand, runCommandSummary, runStatus, showAnticipatedStepsTitle } = props
-  console.log(analysisCommand)
   const { t } = useTranslation('run_details')
   const currentRunId = useCurrentRunId()
   const [commandItemRef, isInView] = useInView({
@@ -150,7 +149,7 @@ function CommandItemComponent(props: CommandItemProps): JSX.Element | null {
   `
   return (
     <>
-      {showAnticipatedStepsTitle && (
+      {false && showAnticipatedStepsTitle && (
         <Flex
           fontSize={FONT_SIZE_CAPTION}
           marginLeft={SPACING_2}
@@ -160,9 +159,9 @@ function CommandItemComponent(props: CommandItemProps): JSX.Element | null {
         </Flex>
       )}
       <Flex css={WRAPPER_STYLE} ref={commandItemRef}>
-        {/* {commandStatus === 'running' ? (
+        {commandStatus === 'running' ? (
           <CurrentCommandLabel runStatus={runStatus} />
-        ) : null} */}
+        ) : null}
         {commandStatus === 'failed' ? <CommandFailedMessage /> : null}
         {isComment ? (
           <Flex

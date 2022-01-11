@@ -106,7 +106,7 @@ export function CommandText(props: Props): JSX.Element | null {
           values={{
             well_name: wellName,
             labware: getLabwareDisplayName(
-              labwareRenderInfoById[labwareId].labwareDef
+              protocolData.labwareDefinitions[protocolData.labware[labwareId].definitionId]
             ),
             labware_location: labwareLocation.slotName,
           }}

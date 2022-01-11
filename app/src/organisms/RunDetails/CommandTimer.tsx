@@ -30,6 +30,7 @@ export function CommandTimer(props: TimerProps): JSX.Element | null {
       textTransform={TEXT_TRANSFORM_UPPERCASE}
       fontSize={FONT_SIZE_CAPTION}
       fontWeight={FONT_WEIGHT_REGULAR}
+      marginRight={SPACING_1}
     >
       <Flex>
         <Flex marginRight={SPACING_1}>{t('start_step_time')}</Flex>
