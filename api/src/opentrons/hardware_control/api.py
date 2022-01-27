@@ -64,6 +64,8 @@ if TYPE_CHECKING:
     from .dev_types import PipetteDict
 
 
+from opentrons.perf_testing import timestamp
+
 mod_log = logging.getLogger(__name__)
 
 
@@ -996,6 +998,8 @@ class API(HardwareControlAPI):
                            it if it was going to go faster. Direct speed
                            is still set by ``speed``.
         """
+        timestamp("move_to", "start")
+
         if not self._current_position:
             await self.home()
 
@@ -1042,9 +1046,14 @@ class API(HardwareControlAPI):
             )
 
         await self._cache_and_maybe_retract_mount(primary_mount)
+
+        timestamp("move_to", "calc_finish")
+
         await self._move(
             target_position, speed=speed, max_speeds=max_speeds, secondary_z=secondary_z
         )
+
+        timestamp("move_to", "end")
 
     async def move_rel(
         self,

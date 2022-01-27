@@ -33,6 +33,9 @@ from .legacy_wrappers import (
 )
 
 
+from opentrons.perf_testing import start_perf_recording, stop_perf_recording
+
+
 @dataclass(frozen=True)
 class ProtocolRunData:
     """Data from a protocol run."""
@@ -157,9 +160,11 @@ class ProtocolRunner:
         if protocol_source:
             self.load(protocol_source)
 
+        start_perf_recording()
         self.play()
         self._task_queue.start()
         await self._task_queue.join()
+        stop_perf_recording()
 
         return ProtocolRunData(
             commands=self._protocol_engine.state_view.commands.get_all(),

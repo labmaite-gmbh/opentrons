@@ -3,6 +3,8 @@
 import asyncio
 import functools
 from typing import Generic, TypeVar
+
+from opentrons.perf_testing import timestamp
 from .protocols import AsyncioConfigurable
 
 
@@ -51,8 +53,22 @@ class SynchronousAdapter(Generic[WrappedObj]):
 
     @staticmethod
     def call_coroutine_sync(loop, to_call, *args, **kwargs):
+        if (
+            to_call.__module__ == "opentrons.hardware_control.api"
+            and to_call.__name__ == "move_to"
+        ):
+            timestamp("sync_adapter", "start")
+
         fut = asyncio.run_coroutine_threadsafe(to_call(*args, **kwargs), loop)
-        return fut.result()
+        res = fut.result()
+
+        if (
+            to_call.__module__ == "opentrons.hardware_control.api"
+            and to_call.__name__ == "move_to"
+        ):
+            timestamp("sync_adapter", "end")
+
+        return res
 
     def __getattribute__(self, attr_name):
         """Retrieve attributes from our API and wrap coroutines"""
