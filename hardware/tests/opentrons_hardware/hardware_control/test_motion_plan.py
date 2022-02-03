@@ -17,11 +17,13 @@ from opentrons_hardware.hardware_control.motion_planning.types import (
 def generate_axis_constraint(draw: st.DrawFn) -> AxisConstraints:
     """Create axis constraint using Hypothesis."""
     acc = draw(st.integers(min_value=500, max_value=5000))
+    speed = draw(st.integers(min_value=100, max_value=700))
     speed_dist = draw(st.integers(min_value=100, max_value=500))
     dir_change_dist = draw(st.integers(min_value=10, max_value=100))
     assume(speed_dist > dir_change_dist)
     return AxisConstraints.build(
         max_acceleration=acc,
+        max_speed=speed,
         max_speed_discont=speed_dist,
         max_direction_change_speed_discont=dir_change_dist,
     )

@@ -1,5 +1,7 @@
 """Utils for motion planning."""
+from audioop import maxpp
 import numpy as np  # type: ignore[import]
+import functools
 import logging
 from typing import Iterator, List, Tuple
 
@@ -27,6 +29,19 @@ def apply_constraint(constraint: np.float64, input: np.float64) -> np.float64:
 def check_less_or_close(constraint: np.float64, input: np.float64) -> bool:
     """Evaluate whether the input value equals to or less than the constraint."""
     return abs(input) <= constraint or bool(np.isclose(input, constraint))
+
+
+def cap_at_axis_max_speed(decorated_obj):
+
+    @functools.wraps(decorated_obj)
+    def wrapper(axis_constraints: AxisConstraints, *args, **kwargs):
+        print("here!")
+        max_speed = axis_constraints.max_speed
+        print(f"max speed: {max_speed}")
+        speed = decorated_obj(axis_constraints, *args, **kwargs)
+        return apply_constraint(max_speed, speed)
+
+    return wrapper
 
 
 def get_unit_vector(
@@ -76,6 +91,7 @@ def targets_to_moves(initial: Coordinates, targets: List[MoveTarget]) -> Iterato
         initial = target.position
 
 
+@cap_at_axis_max_speed
 def initial_speed_limit_from_axis(
     axis_constraints: AxisConstraints,
     axis_component: np.float64,
@@ -140,7 +156,6 @@ def find_initial_speed(
             axis_constrained_speed = initial_speed_limit_from_axis(
                 axis_constraints, axis_component, prev_component, prev_final_speed
             )
-
         log.debug(
             f"Axis_constrained_speed for {axis} is {axis_constrained_speed} compared "
             f"to initial speed: {initial_speed}"
@@ -151,6 +166,7 @@ def find_initial_speed(
     return initial_speed
 
 
+@cap_at_axis_max_speed
 def final_speed_limit_from_axis(
     axis_constraints: AxisConstraints,
     axis_component: np.float64,
