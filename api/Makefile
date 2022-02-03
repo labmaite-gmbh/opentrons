@@ -223,7 +223,7 @@ push-file:
 
 .PHONE: push-folder
 push-folder:
-	scp -r $(file_path) root@$(host):/data/user_storage
+	scp -r $(file_path) root@$(host):$(dest)
 
 .PHONY: jupyter
 jupyter:
