@@ -311,7 +311,7 @@ class Controller:
         """Run a probe and return the new position dict"""
         return await self._smoothie_driver.probe_axis(axis, distance)
 
-    async def probe_instrument(self, mount: Mount, axis: Axis, distance: float) -> Dict[str, float]:
+    async def probe_instrument(self, mount: Mount, axis: Axis, distance: float, speed: float) -> Dict[str, float]:
         """Run a probe using a pipette endstop (L or R), and return the new position dict"""
         if mount == Mount.LEFT:
             instrument = 'L'
@@ -319,7 +319,7 @@ class Controller:
             instrument = 'R'
         else:
             raise ValueError(f'Unexpected mount in probe_instrument {mount}')
-        return await self._smoothie_driver.probe_instrument(instrument, str(axis).upper(), distance)
+        return await self._smoothie_driver.probe_instrument(instrument, str(axis).upper(), distance, speed)
 
     def clean_up(self):
         try:

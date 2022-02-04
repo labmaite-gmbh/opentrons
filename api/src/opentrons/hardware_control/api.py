@@ -378,7 +378,8 @@ class API(HardwareAPILike):
         """
         return await self._backend.limit_switch_state()
 
-    async def probe_instrument(self, mount: top_types.Mount, axis: Axis, distance: float) -> Dict[Axis, float]:
+    async def probe_instrument(
+            self, mount: top_types.Mount, axis: Axis, distance: float, speed: float) -> Dict[Axis, float]:
         """Run a probing sequence on the selected axis, listening for the passed instrument's limit switch to trigger
 
         The movement will immediately stop when the limit switch is triggered.
@@ -387,7 +388,7 @@ class API(HardwareAPILike):
 
         """
         self._current_position = self._deck_from_smoothie(
-            await self._backend.probe_instrument(mount, axis, distance)
+            await self._backend.probe_instrument(mount, axis, distance, speed)
         )
         return self._current_position.copy()
 

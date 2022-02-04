@@ -40,7 +40,6 @@ from opentrons.drivers.smoothie_drivers.constants import (
     UNSTICK_SPEED,
     DEFAULT_AXES_SPEED,
     XY_HOMING_SPEED,
-    PROBE_INSTRUMENT_SPEED,
     HOME_SEQUENCE,
     AXES,
     DISABLE_AXES,
@@ -1733,7 +1732,8 @@ class SmoothieDriver:
         else:
             raise RuntimeError(f"Cant probe axis {axis}")
 
-    async def probe_instrument(self, instrument: str, axis: str, probing_distance: float) -> Dict[str, float]:
+    async def probe_instrument(
+            self, instrument: str, axis: str, probing_distance: float, speed: float) -> Dict[str, float]:
         axis = axis.upper()
         if axis not in AXES:
             raise RuntimeError(f"Cant probe-with-instrument on axis {axis}")
@@ -1746,7 +1746,7 @@ class SmoothieDriver:
             ax for ax in AXES if ax.upper() is not axis
         ]))
         self.push_axis_max_speed()
-        await self.set_axis_max_speed({axis: PROBE_INSTRUMENT_SPEED})
+        await self.set_axis_max_speed({axis: speed})
         command = (
             _command_builder()
             .add_gcode(gcode=GCODE.PROBE_INSTRUMENT)
