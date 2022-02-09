@@ -1741,10 +1741,8 @@ class SmoothieDriver:
         if instrument not in ['L', 'R']:
             raise RuntimeError(f"Cant probe-with-instrument using side {instrument}, must be L or R")
         self.engaged_axes[axis] = True
+        self.dwell_axes("".join(AXES))
         self.activate_axes(axis)
-        self.dwell_axes("".join([
-            ax for ax in AXES if ax.upper() is not axis
-        ]))
         self.push_axis_max_speed()
         await self.set_axis_max_speed({axis: speed})
         command = (
