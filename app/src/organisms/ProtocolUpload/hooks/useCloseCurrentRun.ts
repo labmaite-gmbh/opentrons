@@ -1,57 +1,37 @@
-import {
-  useStopRunMutation,
-  useDismissCurrentRunMutation,
-} from '@opentrons/react-api-client'
-import { UseDismissCurrentRunMutationOptions } from '@opentrons/react-api-client/src/runs/useDismissCurrentRunMutation'
-import { useDeleteRunMutation } from '../../../../../react-api-client/src/runs'
-import { useCurrentProtocolRun } from './useCurrentProtocolRun'
+import * as React from 'react'
+import { useDismissCurrentRunMutation } from '@opentrons/react-api-client'
 import { useCurrentRunId } from './useCurrentRunId'
-import type { RunStatus } from '@opentrons/api-client'
+import type { UseDismissCurrentRunMutationOptions } from '@opentrons/react-api-client/src/runs/useDismissCurrentRunMutation'
 
-const isStoppedState = (status: RunStatus): boolean => {
-  if (
-    status === 'stop-requested' ||
-    status === 'stopped' ||
-    status === 'failed' ||
-    status === 'succeeded'
-  ) {
-    return true
-  }
-  return false
-}
+type CloseCallback = (options?: UseDismissCurrentRunMutationOptions) => void
 
-export function useCloseCurrentRun(): (
-  options?: UseDismissCurrentRunMutationOptions
-) => void {
+export function useCloseCurrentRun(): {
+  closeCurrentRun: CloseCallback
+  isClosingCurrentRun: boolean
+} {
   const currentRunId = useCurrentRunId()
-  const { dismissCurrentRun } = useDismissCurrentRunMutation()
-  const { runRecord } = useCurrentProtocolRun()
+  const {
+    dismissCurrentRun,
+    isLoading: isDismissing,
+  } = useDismissCurrentRunMutation()
 
-  const { stopRun } = useStopRunMutation()
-  const { deleteRun } = useDeleteRunMutation()
-
-  return (options: UseDismissCurrentRunMutationOptions = {}) => {
+  const closeCurrentRun = (
+    options?: UseDismissCurrentRunMutationOptions
+  ): void => {
     if (currentRunId != null) {
-      const status = runRecord?.data.status
-      if (isStoppedState(status as RunStatus)) {
-        dismissCurrentRun(currentRunId, {
-          // if we error when dismissing, delete the run
-          onError: () => deleteRun(currentRunId),
-        })
-      } else {
-        stopRun(currentRunId, {
-          onSuccess: _data => {
-            dismissCurrentRun(currentRunId, options)
-          },
-          // if we error when stopping, dismiss the run
-          onError: () => {
-            dismissCurrentRun(currentRunId, {
-              // if we error when dismissing, delete the run
-              onError: () => deleteRun(currentRunId),
-            })
-          },
-        })
-      }
+      dismissCurrentRun(currentRunId, {
+        ...options,
+        onError: () => console.warn('failed to dismiss current'),
+      })
     }
+  }
+  const closeCurrentRunCallback = React.useCallback(closeCurrentRun, [
+    dismissCurrentRun,
+    currentRunId,
+  ])
+
+  return {
+    closeCurrentRun: closeCurrentRunCallback,
+    isClosingCurrentRun: isDismissing,
   }
 }

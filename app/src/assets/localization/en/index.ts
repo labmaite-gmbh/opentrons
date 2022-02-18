@@ -1,4 +1,6 @@
 import shared from './shared.json'
+import device_details from './device_details.json'
+import devices_landing from './devices_landing.json'
 import labware_position_check from './labware_position_check.json'
 import more_network_and_system from './more_network_and_system.json'
 import more_panel from './more_panel.json'
@@ -12,9 +14,12 @@ import robot_controls from './robot_controls.json'
 import robot_info from './robot_info.json'
 import run_details from './run_details.json'
 import top_navigation from './top_navigation.json'
+import heater_shaker from './heater_shaker.json'
 
 export const en = {
   shared,
+  device_details,
+  devices_landing,
   labware_position_check,
   more_network_and_system,
   more_panel,
@@ -28,4 +33,5 @@ export const en = {
   robot_info,
   run_details,
   top_navigation,
+  heater_shaker,
 }

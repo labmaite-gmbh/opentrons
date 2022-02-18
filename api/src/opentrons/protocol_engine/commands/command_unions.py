@@ -2,21 +2,42 @@
 
 from typing import Union
 
-from .add_labware_definition import (
-    AddLabwareDefinition,
-    AddLabwareDefinitionCreate,
-    AddLabwareDefinitionResult,
-    AddLabwareDefinitionCommandType,
+from .aspirate import (
+    Aspirate,
+    AspirateParams,
+    AspirateCreate,
+    AspirateResult,
+    AspirateCommandType,
 )
 
-from .aspirate import Aspirate, AspirateCreate, AspirateResult, AspirateCommandType
+from .custom import (
+    Custom,
+    CustomParams,
+    CustomResult,
+    CustomCommandType,
+)
 
-from .dispense import Dispense, DispenseCreate, DispenseResult, DispenseCommandType
+from .dispense import (
+    Dispense,
+    DispenseParams,
+    DispenseCreate,
+    DispenseResult,
+    DispenseCommandType,
+)
 
-from .drop_tip import DropTip, DropTipCreate, DropTipResult, DropTipCommandType
+from .drop_tip import (
+    DropTip,
+    DropTipParams,
+    DropTipCreate,
+    DropTipResult,
+    DropTipCommandType,
+)
+
+from .home import Home, HomeParams, HomeCreate, HomeResult, HomeCommandType
 
 from .load_labware import (
     LoadLabware,
+    LoadLabwareParams,
     LoadLabwareCreate,
     LoadLabwareResult,
     LoadLabwareCommandType,
@@ -24,6 +45,7 @@ from .load_labware import (
 
 from .load_module import (
     LoadModule,
+    LoadModuleParams,
     LoadModuleCreate,
     LoadModuleResult,
     LoadModuleCommandType,
@@ -31,15 +53,23 @@ from .load_module import (
 
 from .load_pipette import (
     LoadPipette,
+    LoadPipetteParams,
     LoadPipetteCreate,
     LoadPipetteResult,
     LoadPipetteCommandType,
 )
 
-from .home import Home, HomeCreate, HomeResult, HomeCommandType
+from .magnetic_module_engage import (
+    MagneticModuleEngage,
+    MagneticModuleEngageParams,
+    MagneticModuleEngageCreate,
+    MagneticModuleEngageResult,
+    MagneticModuleEngageCommandType,
+)
 
 from .move_relative import (
     MoveRelative,
+    MoveRelativeParams,
     MoveRelativeCreate,
     MoveRelativeResult,
     MoveRelativeCommandType,
@@ -47,101 +77,116 @@ from .move_relative import (
 
 from .move_to_well import (
     MoveToWell,
+    MoveToWellParams,
     MoveToWellCreate,
     MoveToWellResult,
     MoveToWellCommandType,
-)
-
-from .pick_up_tip import (
-    PickUpTip,
-    PickUpTipCreate,
-    PickUpTipResult,
-    PickUpTipCommandType,
 )
 
 from .pause import (
     Pause,
+    PauseParams,
     PauseCreate,
     PauseResult,
     PauseCommandType,
+)
+
+from .pick_up_tip import (
+    PickUpTip,
+    PickUpTipParams,
+    PickUpTipCreate,
+    PickUpTipResult,
+    PickUpTipCommandType,
 )
 
 from .save_position import (
     SavePosition,
+    SavePositionParams,
     SavePositionCreate,
     SavePositionResult,
     SavePositionCommandType,
 )
 
-from .custom import (
-    Custom,
-    CustomResult,
-    CustomCommandType,
-)
-
 Command = Union[
-    AddLabwareDefinition,
     Aspirate,
+    Custom,
     Dispense,
     DropTip,
+    Home,
     LoadLabware,
     LoadModule,
     LoadPipette,
-    Home,
+    MagneticModuleEngage,
     MoveRelative,
     MoveToWell,
-    PickUpTip,
     Pause,
+    PickUpTip,
     SavePosition,
-    Custom,
+]
+
+CommandParams = Union[
+    AspirateParams,
+    CustomParams,
+    DispenseParams,
+    DropTipParams,
+    HomeParams,
+    LoadLabwareParams,
+    LoadModuleParams,
+    LoadPipetteParams,
+    MagneticModuleEngageParams,
+    MoveRelativeParams,
+    MoveToWellParams,
+    PauseParams,
+    PickUpTipParams,
+    SavePositionParams,
 ]
 
 CommandType = Union[
-    AddLabwareDefinitionCommandType,
     AspirateCommandType,
+    CustomCommandType,
     DispenseCommandType,
     DropTipCommandType,
+    HomeCommandType,
     LoadLabwareCommandType,
     LoadModuleCommandType,
     LoadPipetteCommandType,
-    HomeCommandType,
+    MagneticModuleEngageCommandType,
     MoveRelativeCommandType,
     MoveToWellCommandType,
-    PickUpTipCommandType,
     PauseCommandType,
+    PickUpTipCommandType,
     SavePositionCommandType,
-    CustomCommandType,
 ]
 
 CommandCreate = Union[
-    AddLabwareDefinitionCreate,
     AspirateCreate,
     DispenseCreate,
     DropTipCreate,
+    HomeCreate,
     LoadLabwareCreate,
     LoadModuleCreate,
     LoadPipetteCreate,
-    HomeCreate,
+    MagneticModuleEngageCreate,
     MoveRelativeCreate,
     MoveToWellCreate,
-    PickUpTipCreate,
     PauseCreate,
+    PickUpTipCreate,
     SavePositionCreate,
 ]
 
 CommandResult = Union[
-    AddLabwareDefinitionResult,
     AspirateResult,
+    CustomResult,
     DispenseResult,
     DropTipResult,
+    HomeResult,
     LoadLabwareResult,
     LoadModuleResult,
     LoadPipetteResult,
-    HomeResult,
+    MagneticModuleEngageResult,
     MoveRelativeResult,
     MoveToWellResult,
-    PickUpTipResult,
     PauseResult,
+    PickUpTipResult,
     SavePositionResult,
-    CustomResult,
 ]

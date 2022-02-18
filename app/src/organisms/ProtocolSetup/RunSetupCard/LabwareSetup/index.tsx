@@ -1,7 +1,11 @@
 import * as React from 'react'
+import { useSelector } from 'react-redux'
 import map from 'lodash/map'
+import isEmpty from 'lodash/isEmpty'
+import some from 'lodash/some'
 import { useTranslation } from 'react-i18next'
 import { RUN_STATUS_IDLE } from '@opentrons/api-client'
+import * as Config from '../../../../redux/config'
 import {
   Btn,
   Flex,
@@ -9,23 +13,23 @@ import {
   Link,
   Module,
   RobotWorkSpace,
-  SecondaryBtn,
+  NewSecondaryBtn,
   Text,
   Tooltip,
   useHoverTooltip,
-  TEXT_ALIGN_CENTER,
   TOOLTIP_LEFT,
   ALIGN_FLEX_END,
   DIRECTION_COLUMN,
   FONT_SIZE_BODY_1,
   JUSTIFY_CENTER,
-  SIZE_5,
   SPACING_3,
   C_BLUE,
   C_DARK_GRAY,
   DIRECTION_ROW,
   Box,
   FONT_WEIGHT_SEMIBOLD,
+  C_NEAR_WHITE,
+  SPACING_7,
 } from '@opentrons/components'
 import {
   inferModuleOrientationFromXCoordinate,
@@ -36,7 +40,14 @@ import standardDeckDef from '@opentrons/shared-data/deck/definitions/2/ot2_stand
 import { useRunStatus } from '../../../RunTimeControl/hooks'
 import { LabwarePositionCheck } from '../../LabwarePositionCheck'
 import styles from '../../styles.css'
-import { useModuleRenderInfoById, useLabwareRenderInfoById } from '../../hooks'
+import { useProtocolDetails } from '../../../RunDetails/hooks'
+import { DownloadOffsetDataModal } from '../../../ProtocolUpload/DownloadOffsetDataModal'
+import {
+  useModuleRenderInfoById,
+  useLabwareRenderInfoById,
+  useLPCSuccessToast,
+} from '../../hooks'
+import { useModuleMatchResults, useProtocolCalibrationStatus } from '../hooks'
 import { LabwareInfoOverlay } from './LabwareInfoOverlay'
 import { LabwareOffsetModal } from './LabwareOffsetModal'
 import { getModuleTypesThatRequireExtraAttention } from './utils/getModuleTypesThatRequireExtraAttention'
@@ -57,12 +68,13 @@ const DECK_MAP_VIEWBOX = '-80 -40 550 500'
 export const LabwareSetup = (): JSX.Element | null => {
   const moduleRenderInfoById = useModuleRenderInfoById()
   const labwareRenderInfoById = useLabwareRenderInfoById()
+  const moduleMatchResults = useModuleMatchResults()
+  const isEverythingCalibrated = useProtocolCalibrationStatus().complete
   const [targetProps, tooltipProps] = useHoverTooltip({
     placement: TOOLTIP_LEFT,
   })
   const runStatus = useRunStatus()
-  const disableLabwarePositionCheck =
-    runStatus != null && runStatus !== RUN_STATUS_IDLE
+  const { protocolData } = useProtocolDetails()
   const { t } = useTranslation('protocol_setup')
   const [
     showLabwareHelpModal,
@@ -80,6 +92,45 @@ export const LabwareSetup = (): JSX.Element | null => {
     showLabwarePositionCheckModal,
     setShowLabwarePositionCheckModal,
   ] = React.useState<boolean>(false)
+  const { missingModuleIds } = moduleMatchResults
+  const calibrationIncomplete =
+    missingModuleIds.length === 0 && !isEverythingCalibrated
+  const moduleSetupIncomplete =
+    missingModuleIds.length > 0 && isEverythingCalibrated
+  const moduleAndCalibrationIncomplete =
+    missingModuleIds.length > 0 && !isEverythingCalibrated
+
+  const tipRackLoadedInProtocol: boolean = some(
+    protocolData?.labwareDefinitions,
+    def => def.parameters?.isTiprack
+  )
+
+  const [downloadOffsetDataModal, showDownloadOffsetDataModal] = React.useState(
+    false
+  )
+  const isLabwareOffsetCodeSnippetsOn = useSelector(
+    Config.getIsLabwareOffsetCodeSnippetsOn
+  )
+  const { setIsShowingLPCSuccessToast } = useLPCSuccessToast()
+
+  let lpcDisabledReason: string | null = null
+
+  if (moduleAndCalibrationIncomplete) {
+    lpcDisabledReason = t('lpc_disabled_modules_and_calibration_not_complete')
+  } else if (calibrationIncomplete) {
+    lpcDisabledReason = t('lpc_disabled_calibration_not_complete')
+  } else if (moduleSetupIncomplete) {
+    lpcDisabledReason = t('lpc_disabled_modules_not_connected')
+  } else if (runStatus != null && runStatus !== RUN_STATUS_IDLE) {
+    lpcDisabledReason = t('labware_position_check_not_available')
+  } else if (
+    isEmpty(protocolData?.pipettes) ||
+    isEmpty(protocolData?.labware)
+  ) {
+    lpcDisabledReason = t('labware_position_check_not_available_empty_protocol')
+  } else if (!tipRackLoadedInProtocol) {
+    lpcDisabledReason = t('lpc_disabled_no_tipracks_loaded')
+  }
 
   return (
     <React.Fragment>
@@ -93,7 +144,12 @@ export const LabwareSetup = (): JSX.Element | null => {
           onCloseClick={() => setShowLabwarePositionCheckModal(false)}
         />
       )}
-      <Flex flex="1" maxHeight="85vh" flexDirection={DIRECTION_COLUMN}>
+      {downloadOffsetDataModal && (
+        <DownloadOffsetDataModal
+          onCloseClick={() => showDownloadOffsetDataModal(false)}
+        />
+      )}
+      <Flex flex="1" maxHeight="100vh" flexDirection={DIRECTION_COLUMN}>
         {moduleTypesThatRequireExtraAttention.length > 0 && (
           <ExtraAttentionWarning
             moduleTypes={moduleTypesThatRequireExtraAttention}
@@ -160,18 +216,33 @@ export const LabwareSetup = (): JSX.Element | null => {
             )
           }}
         </RobotWorkSpace>
-        <Flex flexDirection={DIRECTION_ROW}>
+        <Flex
+          flexDirection={DIRECTION_ROW}
+          backgroundColor={C_NEAR_WHITE}
+          padding={SPACING_3}
+        >
           <Box flexDirection={DIRECTION_COLUMN} width="65%">
-            <Text
-              color={C_DARK_GRAY}
-              fontWeight={FONT_WEIGHT_SEMIBOLD}
-              marginLeft={SPACING_3}
-            >
+            <Text color={C_DARK_GRAY} fontWeight={FONT_WEIGHT_SEMIBOLD}>
               {t('lpc_and_offset_data_title')}
             </Text>
-            <Text color={C_DARK_GRAY} margin={SPACING_3}>
+            <Text
+              color={C_DARK_GRAY}
+              marginRight={SPACING_3}
+              marginY={SPACING_3}
+            >
               {t('labware_position_check_text')}
             </Text>
+            {isLabwareOffsetCodeSnippetsOn ? (
+              <Link
+                role={'link'}
+                fontSize={FONT_SIZE_BODY_1}
+                color={C_BLUE}
+                onClick={() => showDownloadOffsetDataModal(true)}
+                id={'DownloadOffsetData'}
+              >
+                {t('get_labware_offset_data')}
+              </Link>
+            ) : null}
           </Box>
           <Flex flexDirection={DIRECTION_COLUMN}>
             <Btn
@@ -181,28 +252,26 @@ export const LabwareSetup = (): JSX.Element | null => {
               alignSelf={ALIGN_FLEX_END}
               onClick={() => setShowLabwareHelpModal(true)}
               data-test={'LabwareSetup_helpLink'}
-              marginBottom={SPACING_3}
+              marginY={SPACING_3}
             >
               {t('labware_help_link_title')}
             </Btn>
             <Flex justifyContent={JUSTIFY_CENTER}>
-              <SecondaryBtn
+              <NewSecondaryBtn
                 title={t('run_labware_position_check')}
-                onClick={() => setShowLabwarePositionCheckModal(true)}
-                color={C_BLUE}
+                onClick={() => {
+                  setShowLabwarePositionCheckModal(true)
+                  setIsShowingLPCSuccessToast(false)
+                }}
                 id={'LabwareSetup_checkLabwarePositionsButton'}
                 {...targetProps}
-                disabled={disableLabwarePositionCheck}
+                disabled={lpcDisabledReason !== null}
               >
                 {t('run_labware_position_check')}
-              </SecondaryBtn>
-              {disableLabwarePositionCheck ? (
-                <Tooltip {...tooltipProps}>
-                  {
-                    <Box width={SIZE_5} textAlign={TEXT_ALIGN_CENTER}>
-                      {t('labware_position_check_not_available')}
-                    </Box>
-                  }
+              </NewSecondaryBtn>
+              {lpcDisabledReason !== null ? (
+                <Tooltip maxWidth={SPACING_7} {...tooltipProps}>
+                  {lpcDisabledReason}
                 </Tooltip>
               ) : null}
             </Flex>

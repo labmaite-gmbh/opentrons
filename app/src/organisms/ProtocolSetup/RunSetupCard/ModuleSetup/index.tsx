@@ -7,7 +7,7 @@ import {
   Btn,
   Link,
   Module,
-  PrimaryBtn,
+  NewPrimaryBtn,
   RobotWorkSpace,
   ALIGN_FLEX_END,
   DIRECTION_COLUMN,
@@ -20,11 +20,13 @@ import {
 } from '@opentrons/components'
 import { inferModuleOrientationFromXCoordinate } from '@opentrons/shared-data'
 import standardDeckDef from '@opentrons/shared-data/deck/definitions/2/ot2_standard.json'
-import { useMissingModuleIds } from '../hooks'
+import { useModuleMatchResults } from '../hooks'
+import { useModuleRenderInfoById } from '../../hooks'
 import { fetchModules } from '../../../../redux/modules'
 import { ModuleInfo } from './ModuleInfo'
+import { UnMatchedModuleWarning } from './UnMatchedModuleWarning'
 import { MultipleModulesModal } from './MultipleModulesModal'
-import { useModuleRenderInfoById } from '../../hooks'
+import { HeaterShakerBanner } from './HeaterShakerSetupWizard/HeaterShakerBanner'
 import styles from '../../styles.css'
 
 import type { Dispatch } from '../../../../redux/types'
@@ -56,13 +58,13 @@ export function ModuleSetup(props: ModuleSetupProps): JSX.Element {
     showMultipleModulesModal,
     setShowMultipleModulesModal,
   ] = React.useState<boolean>(false)
-  const missingModuleIds = useMissingModuleIds()
+
+  const moduleMatchResults = useModuleMatchResults()
   useInterval(
     () => dispatch(fetchModules(robotName)),
     robotName === null ? POLL_MODULE_INTERVAL_MS : null,
     true
   )
-
   const moduleModels = map(
     moduleRenderInfoById,
     ({ moduleDef }) => moduleDef.model
@@ -70,18 +72,35 @@ export function ModuleSetup(props: ModuleSetupProps): JSX.Element {
 
   const hasADuplicateModule = new Set(moduleModels).size !== moduleModels.length
 
+  const { missingModuleIds, remainingAttachedModules } = moduleMatchResults
+
   const proceedToLabwareDisabledReason =
     missingModuleIds.length > 0
       ? t('plug_in_required_module', { count: missingModuleIds.length })
       : null
 
   return (
-    <Flex flex="1" maxHeight="80vh" flexDirection={DIRECTION_COLUMN}>
+    <Flex flex="1" maxHeight="100vh" flexDirection={DIRECTION_COLUMN}>
       {showMultipleModulesModal && (
         <MultipleModulesModal
           onCloseClick={() => setShowMultipleModulesModal(false)}
         />
       )}
+
+      {map(moduleRenderInfoById, ({ moduleDef }, index) => {
+        const { model } = moduleDef
+        return (
+          <React.Fragment key={index}>
+            {/* @ts-expect-error: this is always false until heater shaker is added to model */}
+            {model === 'heatershakermoduleV1' && (
+              <Flex key="heater_shaker_banner">
+                <HeaterShakerBanner displayName={moduleDef.displayName} />
+              </Flex>
+            )}
+          </React.Fragment>
+        )
+      })}
+
       {hasADuplicateModule ? (
         <Btn
           as={Link}
@@ -94,6 +113,12 @@ export function ModuleSetup(props: ModuleSetupProps): JSX.Element {
           {t('multiple_modules_help_link_title')}
         </Btn>
       ) : null}
+
+      <UnMatchedModuleWarning
+        isAnyModuleUnnecessary={
+          remainingAttachedModules.length !== 0 && missingModuleIds.length !== 0
+        }
+      />
       <RobotWorkSpace
         deckDef={standardDeckDef as any}
         viewBox={DECK_VIEW_BOX}
@@ -129,18 +154,17 @@ export function ModuleSetup(props: ModuleSetupProps): JSX.Element {
           </>
         )}
       </RobotWorkSpace>
-      <PrimaryBtn
+      <NewPrimaryBtn
         title={t('proceed_to_labware_setup_step')}
         disabled={proceedToLabwareDisabledReason != null}
         onClick={expandLabwareSetupStep}
-        backgroundColor={C_BLUE}
         id={'ModuleSetup_proceedToLabwareSetup'}
         width="18rem"
         alignSelf={ALIGN_CENTER}
         {...targetProps}
       >
         {t('proceed_to_labware_setup_step')}
-      </PrimaryBtn>
+      </NewPrimaryBtn>
       {proceedToLabwareDisabledReason != null && (
         <Tooltip {...tooltipProps}>{proceedToLabwareDisabledReason}</Tooltip>
       )}

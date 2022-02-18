@@ -2,23 +2,27 @@
 
 Contains routes dealing primarily with `Run` models.
 """
-from fastapi import APIRouter, Depends, status
+import logging
 from datetime import datetime
-from pydantic import BaseModel, Field
 from typing import Optional, Union
 from typing_extensions import Literal
 
+from fastapi import APIRouter, Depends, status
+from pydantic import BaseModel, Field
+
 from opentrons.protocol_engine import LabwareOffsetCreate
 
-from robot_server.errors import ErrorDetails, ErrorResponse
+from robot_server.errors import ErrorDetails, ErrorBody
 from robot_server.service.dependencies import get_current_time, get_unique_id
 from robot_server.service.task_runner import TaskRunner
 from robot_server.service.json_api import (
     RequestModel,
-    SimpleResponseModel,
-    SimpleEmptyResponseModel,
-    MultiResponseModel,
+    SimpleBody,
+    SimpleEmptyBody,
+    MultiBody,
+    MultiBodyMeta,
     ResourceLink,
+    PydanticResponse,
 )
 
 from robot_server.protocols import (
@@ -30,15 +34,12 @@ from robot_server.protocols import (
 
 from ..run_store import RunStore, RunResource, RunNotFoundError
 from ..run_view import RunView
-from ..run_models import (
-    Run,
-    RunCreate,
-    RunUpdate,
-    RunCommandSummary,
-)
+from ..run_models import Run, RunSummary, RunCreate, RunUpdate
 from ..engine_store import EngineStore, EngineConflictError
 from ..dependencies import get_run_store, get_engine_store
 
+
+log = logging.getLogger(__name__)
 base_router = APIRouter()
 
 
@@ -83,16 +84,48 @@ class AllRunsLinks(BaseModel):
     )
 
 
+async def get_run_data_from_url(
+    runId: str,
+    run_store: RunStore = Depends(get_run_store),
+    engine_store: EngineStore = Depends(get_engine_store),
+) -> Run:
+    """Get the data of a run.
+
+    Args:
+        runId: Run ID pulled from URL.
+        run_store: Run storage interface.
+        engine_store: ProtocolEngine storage and control.
+    """
+    try:
+        run = run_store.get(run_id=runId)
+    except RunNotFoundError as e:
+        raise RunNotFound(detail=str(e)).as_error(status.HTTP_404_NOT_FOUND)
+
+    engine_state = engine_store.get_state(run.run_id)
+
+    return Run.construct(
+        id=run.run_id,
+        protocolId=run.protocol_id,
+        createdAt=run.created_at,
+        current=run.is_current,
+        actions=run.actions,
+        errors=engine_state.commands.get_all_errors(),
+        pipettes=engine_state.pipettes.get_all(),
+        labware=engine_state.labware.get_all(),
+        labwareOffsets=engine_state.labware.get_labware_offsets(),
+        status=engine_state.commands.get_status(),
+    )
+
+
 @base_router.post(
     path="/runs",
     summary="Create a run",
     description="Create a new run to track robot interaction.",
     status_code=status.HTTP_201_CREATED,
-    response_model=SimpleResponseModel[Run],
-    response_model_exclude_none=True,
     responses={
-        status.HTTP_404_NOT_FOUND: {"model": ErrorResponse[ProtocolNotFound]},
-        status.HTTP_409_CONFLICT: {"model": ErrorResponse[RunAlreadyActive]},
+        status.HTTP_201_CREATED: {"model": SimpleBody[Run]},
+        status.HTTP_404_NOT_FOUND: {"model": ErrorBody[ProtocolNotFound]},
+        status.HTTP_409_CONFLICT: {"model": ErrorBody[RunAlreadyActive]},
     },
 )
 async def create_run(
@@ -103,7 +136,7 @@ async def create_run(
     run_id: str = Depends(get_unique_id),
     created_at: datetime = Depends(get_current_time),
     task_runner: TaskRunner = Depends(TaskRunner),
-) -> SimpleResponseModel[Run]:
+) -> PydanticResponse[SimpleBody[Run]]:
     """Create a new run.
 
     Arguments:
@@ -134,11 +167,7 @@ async def create_run(
             engine_store.engine.add_labware_offset(offset_request)
 
     if protocol_resource is not None:
-        engine_store.runner.load(protocol_resource)
-
-    # TODO(mc, 2021-08-05): capture errors from `runner.join` and place
-    # them in the run resource
-    task_runner.run(engine_store.runner.join)
+        engine_store.runner.load(protocol_resource.source)
 
     run = RunResource(
         run_id=run_id,
@@ -149,17 +178,14 @@ async def create_run(
     )
 
     run_store.upsert(run=run)
+    log.info(f'Created protocol run "{run_id}" from protocol "{protocol_id}".')
 
-    data = Run(
+    data = Run.construct(
         id=run_id,
         protocolId=run.protocol_id,
         createdAt=run.created_at,
         current=run.is_current,
         actions=run.actions,
-        commands=[
-            RunCommandSummary(id=c.id, commandType=c.commandType, status=c.status)
-            for c in engine_state.commands.get_all()
-        ],
         errors=[],
         pipettes=engine_state.pipettes.get_all(),
         labware=engine_state.labware.get_all(),
@@ -167,21 +193,24 @@ async def create_run(
         status=engine_state.commands.get_status(),
     )
 
-    return SimpleResponseModel(data=data)
+    return await PydanticResponse.create(
+        content=SimpleBody.construct(data=data),
+        status_code=status.HTTP_201_CREATED,
+    )
 
 
 @base_router.get(
     path="/runs",
     summary="Get all runs",
     description="Get a list of all active and inactive runs.",
-    status_code=status.HTTP_200_OK,
-    response_model=MultiResponseModel[Run, AllRunsLinks],
-    response_model_exclude_none=True,
+    responses={
+        status.HTTP_200_OK: {"model": MultiBody[RunSummary, AllRunsLinks]},
+    },
 )
 async def get_runs(
     run_store: RunStore = Depends(get_run_store),
     engine_store: EngineStore = Depends(get_engine_store),
-) -> MultiResponseModel[Run, AllRunsLinks]:
+) -> PydanticResponse[MultiBody[RunSummary, AllRunsLinks]]:
     """Get all runs.
 
     Args:
@@ -194,103 +223,64 @@ async def get_runs(
     for run in run_store.get_all():
         run_id = run.run_id
         engine_state = engine_store.get_state(run_id)
-        run_data = Run(
+        run_data = RunSummary.construct(
             id=run_id,
             protocolId=run.protocol_id,
             createdAt=run.created_at,
             current=run.is_current,
-            actions=run.actions,
-            commands=[
-                RunCommandSummary(
-                    id=c.id,
-                    commandType=c.commandType,
-                    status=c.status,
-                    errorId=c.errorId,
-                )
-                for c in engine_state.commands.get_all()
-            ],
-            errors=engine_state.commands.get_all_errors(),
-            pipettes=engine_state.pipettes.get_all(),
-            labware=engine_state.labware.get_all(),
-            labwareOffsets=engine_state.labware.get_labware_offsets(),
             status=engine_state.commands.get_status(),
         )
 
         data.append(run_data)
 
         if run.is_current:
-            links.current = ResourceLink(href=f"/runs/{run.run_id}")
+            links.current = ResourceLink.construct(href=f"/runs/{run.run_id}")
 
-    return MultiResponseModel(data=data, links=links)
+    meta = MultiBodyMeta(cursor=0, totalLength=len(data))
+
+    return await PydanticResponse.create(
+        content=MultiBody.construct(data=data, links=links, meta=meta),
+        status_code=status.HTTP_200_OK,
+    )
 
 
 @base_router.get(
     path="/runs/{runId}",
     summary="Get a run",
     description="Get a specific run by its unique identifier.",
-    status_code=status.HTTP_200_OK,
-    response_model=SimpleResponseModel[Run],
-    response_model_exclude_none=True,
-    responses={status.HTTP_404_NOT_FOUND: {"model": ErrorResponse[RunNotFound]}},
+    responses={
+        status.HTTP_200_OK: {"model": SimpleBody[Run]},
+        status.HTTP_404_NOT_FOUND: {"model": ErrorBody[RunNotFound]},
+    },
 )
 async def get_run(
-    runId: str,
-    run_store: RunStore = Depends(get_run_store),
-    engine_store: EngineStore = Depends(get_engine_store),
-) -> SimpleResponseModel[Run]:
+    run_data: Run = Depends(get_run_data_from_url),
+) -> PydanticResponse[SimpleBody[Run]]:
     """Get a run by its ID.
 
     Args:
-        runId: Run ID pulled from URL.
-        run_store: Run storage interface.
-        engine_store: ProtocolEngine storage and control.
+        run_data: Data of the run specified in the runId url parameter.
     """
-    try:
-        run = run_store.get(run_id=runId)
-    except RunNotFoundError as e:
-        raise RunNotFound(detail=str(e)).as_error(status.HTTP_404_NOT_FOUND)
-
-    engine_state = engine_store.get_state(run.run_id)
-
-    data = Run(
-        id=run.run_id,
-        protocolId=run.protocol_id,
-        createdAt=run.created_at,
-        current=run.is_current,
-        actions=run.actions,
-        commands=[
-            RunCommandSummary(
-                id=c.id,
-                commandType=c.commandType,
-                status=c.status,
-                errorId=c.errorId,
-            )
-            for c in engine_state.commands.get_all()
-        ],
-        errors=engine_state.commands.get_all_errors(),
-        pipettes=engine_state.pipettes.get_all(),
-        labware=engine_state.labware.get_all(),
-        labwareOffsets=engine_state.labware.get_labware_offsets(),
-        status=engine_state.commands.get_status(),
+    return await PydanticResponse.create(
+        content=SimpleBody.construct(data=run_data),
+        status_code=status.HTTP_200_OK,
     )
-
-    return SimpleResponseModel(data=data)
 
 
 @base_router.delete(
     path="/runs/{runId}",
     summary="Delete a run",
     description="Delete a specific run by its unique identifier.",
-    status_code=status.HTTP_200_OK,
-    response_model=SimpleEmptyResponseModel,
-    response_model_exclude_none=True,
-    responses={status.HTTP_404_NOT_FOUND: {"model": ErrorResponse[RunNotFound]}},
+    responses={
+        status.HTTP_200_OK: {"model": SimpleEmptyBody},
+        status.HTTP_404_NOT_FOUND: {"model": ErrorBody[RunNotFound]},
+    },
 )
 async def remove_run(
     runId: str,
     run_store: RunStore = Depends(get_run_store),
     engine_store: EngineStore = Depends(get_engine_store),
-) -> SimpleEmptyResponseModel:
+) -> PydanticResponse[SimpleEmptyBody]:
     """Delete a run by its ID.
 
     Arguments:
@@ -299,7 +289,7 @@ async def remove_run(
         engine_store: ProtocolEngine storage and control.
     """
     try:
-        engine_store.clear()
+        await engine_store.clear()
     except EngineConflictError:
         raise RunNotIdle().as_error(status.HTTP_409_CONFLICT)
 
@@ -308,7 +298,10 @@ async def remove_run(
     except RunNotFoundError as e:
         raise RunNotFound(detail=str(e)).as_error(status.HTTP_404_NOT_FOUND)
 
-    return SimpleEmptyResponseModel()
+    return await PydanticResponse.create(
+        content=SimpleEmptyBody.construct(),
+        status_code=status.HTTP_200_OK,
+    )
 
 
 @base_router.post(
@@ -322,13 +315,10 @@ async def remove_run(
         " see the run's `labwareOffsets` field."
     ),
     status_code=status.HTTP_201_CREATED,
-    response_model=SimpleResponseModel[Run],
-    response_model_exclude_none=True,
     responses={
-        status.HTTP_404_NOT_FOUND: {"model": ErrorResponse[RunNotFound]},
-        status.HTTP_409_CONFLICT: {
-            "model": ErrorResponse[Union[RunStopped, RunNotIdle]]
-        },
+        status.HTTP_201_CREATED: {"model": SimpleBody[Run]},
+        status.HTTP_404_NOT_FOUND: {"model": ErrorBody[RunNotFound]},
+        status.HTTP_409_CONFLICT: {"model": ErrorBody[Union[RunStopped, RunNotIdle]]},
     },
 )
 async def add_labware_offset(
@@ -336,7 +326,7 @@ async def add_labware_offset(
     request_body: RequestModel[LabwareOffsetCreate],
     run_store: RunStore = Depends(get_run_store),
     engine_store: EngineStore = Depends(get_engine_store),
-) -> SimpleResponseModel[Run]:
+) -> PydanticResponse[SimpleBody[Run]]:
     """Add a labware offset to a run.
 
     Args:
@@ -355,24 +345,16 @@ async def add_labware_offset(
             status.HTTP_409_CONFLICT
         )
 
-    engine_store.engine.add_labware_offset(request_body.data)
+    added_offset = engine_store.engine.add_labware_offset(request_body.data)
+    log.info(f'Added labware offset "{added_offset.id}"' f' to run "{runId}".')
 
     engine_state = engine_store.get_state(run.run_id)
-    data = Run(
+    data = Run.construct(
         id=run.run_id,
         protocolId=run.protocol_id,
         createdAt=run.created_at,
         current=run.is_current,
         actions=run.actions,
-        commands=[
-            RunCommandSummary(
-                id=c.id,
-                commandType=c.commandType,
-                status=c.status,
-                errorId=c.errorId,
-            )
-            for c in engine_state.commands.get_all()
-        ],
         errors=engine_state.commands.get_all_errors(),
         pipettes=engine_state.pipettes.get_all(),
         labware=engine_state.labware.get_all(),
@@ -380,21 +362,20 @@ async def add_labware_offset(
         status=engine_state.commands.get_status(),
     )
 
-    return SimpleResponseModel(data=data)
+    return await PydanticResponse.create(
+        content=SimpleBody.construct(data=data),
+        status_code=status.HTTP_201_CREATED,
+    )
 
 
 @base_router.patch(
     path="/runs/{runId}",
     summary="Update a run",
-    description="Update a specific run, returing the updated resource.",
-    status_code=status.HTTP_200_OK,
-    response_model=SimpleResponseModel[Run],
-    response_model_exclude_none=True,
+    description="Update a specific run, returning the updated resource.",
     responses={
-        status.HTTP_404_NOT_FOUND: {"model": ErrorResponse[RunNotFound]},
-        status.HTTP_409_CONFLICT: {
-            "model": ErrorResponse[Union[RunStopped, RunNotIdle]]
-        },
+        status.HTTP_200_OK: {"model": SimpleBody[Run]},
+        status.HTTP_404_NOT_FOUND: {"model": ErrorBody[RunNotFound]},
+        status.HTTP_409_CONFLICT: {"model": ErrorBody[Union[RunStopped, RunNotIdle]]},
     },
 )
 async def update_run(
@@ -403,7 +384,7 @@ async def update_run(
     run_view: RunView = Depends(RunView),
     run_store: RunStore = Depends(get_run_store),
     engine_store: EngineStore = Depends(get_engine_store),
-) -> SimpleResponseModel[Run]:
+) -> PydanticResponse[SimpleBody[Run]]:
     """Update a run by its ID.
 
     Args:
@@ -428,29 +409,21 @@ async def update_run(
         run = run_view.with_update(run=run, update=update)
 
         try:
-            engine_store.clear()
+            await engine_store.clear()
         except EngineConflictError:
             raise RunNotIdle().as_error(status.HTTP_409_CONFLICT)
 
         run_store.upsert(run)
+        log.info(f'Marked run "{runId}" as not current.')
 
     engine_state = engine_store.get_state(run.run_id)
 
-    data = Run(
+    data = Run.construct(
         id=run.run_id,
         protocolId=run.protocol_id,
         createdAt=run.created_at,
         current=run.is_current,
         actions=run.actions,
-        commands=[
-            RunCommandSummary(
-                id=c.id,
-                commandType=c.commandType,
-                status=c.status,
-                errorId=c.errorId,
-            )
-            for c in engine_state.commands.get_all()
-        ],
         errors=engine_state.commands.get_all_errors(),
         pipettes=engine_state.pipettes.get_all(),
         labware=engine_state.labware.get_all(),
@@ -458,4 +431,7 @@ async def update_run(
         status=engine_state.commands.get_status(),
     )
 
-    return SimpleResponseModel(data=data)
+    return await PydanticResponse.create(
+        content=SimpleBody.construct(data=data),
+        status_code=status.HTTP_200_OK,
+    )

@@ -5,11 +5,12 @@ import asyncio
 import platform
 from typing import Optional
 
-from can import Notifier, Bus, AsyncBufferedReader, Message, util
+from can import Notifier, Bus, AsyncBufferedReader, Message
 
-from .arbitration_id import ArbitrationId
-from .message import CanMessage
+from opentrons_ot3_firmware.arbitration_id import ArbitrationId
+from opentrons_ot3_firmware.message import CanMessage
 from .errors import ErrorFrameCanError
+from .abstract_driver import AbstractCanDriver
 
 log = logging.getLogger(__name__)
 
@@ -33,12 +34,8 @@ if platform.system() == "Darwin":
     # end super bad monkey patch
 
 
-class CanDriver:
+class CanDriver(AbstractCanDriver):
     """The can driver."""
-
-    DEFAULT_CAN_NETWORK = "can0"
-    DEFAULT_CAN_INTERFACE = "socketcan"
-    DEFAULT_CAN_BITRATE = 250000
 
     def __init__(self, bus: Bus, loop: asyncio.AbstractEventLoop) -> None:
         """Constructor.
@@ -92,18 +89,6 @@ class CanDriver:
             loop=asyncio.get_event_loop(),
         )
 
-    @classmethod
-    async def from_env(cls) -> CanDriver:
-        """Build a CanDriver from env variables."""
-        environment_config = util.load_environment_config()
-        can_channel: str = environment_config.get("channel", cls.DEFAULT_CAN_NETWORK)
-        can_interface: str = environment_config.get(
-            "interface", cls.DEFAULT_CAN_INTERFACE
-        )
-        can_bitrate: int = environment_config.get("bitrate", cls.DEFAULT_CAN_BITRATE)
-
-        return await CanDriver.build(can_interface, can_channel, can_bitrate)
-
     def shutdown(self) -> None:
         """Stop the driver."""
         self._notifier.stop()
@@ -136,24 +121,9 @@ class CanDriver:
         """
         m: Message = await self._reader.get_message()
         if m.is_error_frame:
+            log.error("Error frame encountered")
             raise ErrorFrameCanError(message=repr(m))
 
         return CanMessage(
             arbitration_id=ArbitrationId(id=m.arbitration_id), data=m.data
         )
-
-    def __aiter__(self) -> CanDriver:
-        """Enter iterator.
-
-        Returns:
-            CanDriver
-        """
-        return self
-
-    async def __anext__(self) -> CanMessage:
-        """Async next.
-
-        Returns:
-            CanMessage
-        """
-        return await self.read()

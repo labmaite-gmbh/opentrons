@@ -1,4 +1,5 @@
 import * as React from 'react'
+import isEqual from 'lodash/isEqual'
 import { useTranslation } from 'react-i18next'
 import {
   DIRECTION_ROW,
@@ -10,7 +11,6 @@ import {
   C_NEAR_WHITE,
   C_AQUAMARINE,
   C_MINT,
-  SPACING_2,
   C_ERROR_LIGHT,
   C_POWDER_BLUE,
   ALIGN_CENTER,
@@ -19,8 +19,12 @@ import {
   FONT_WEIGHT_BOLD,
   Icon,
   SPACING_1,
+  SPACING_2,
   SPACING_3,
   TEXT_TRANSFORM_UPPERCASE,
+  C_MED_DARK_GRAY,
+  JUSTIFY_SPACE_BETWEEN,
+  SIZE_1,
 } from '@opentrons/components'
 import { css } from 'styled-components'
 import { CommandTimer } from './CommandTimer'
@@ -29,19 +33,22 @@ import {
   RUN_STATUS_IDLE,
   RUN_STATUS_PAUSE_REQUESTED,
   RUN_STATUS_PAUSED,
+  RUN_STATUS_BLOCKED_BY_OPEN_DOOR,
 } from '@opentrons/api-client'
-import { useCommandQuery } from '@opentrons/react-api-client'
-import { useCurrentRunId } from '../ProtocolUpload/hooks/useCurrentRunId'
 import type { RunStatus, RunCommandSummary } from '@opentrons/api-client'
 
 import type {
-  Command,
+  RunTimeCommand,
   CommandStatus,
 } from '@opentrons/shared-data/protocol/types/schemaV6/command'
 
 export interface CommandItemProps {
-  commandOrSummary: Command | RunCommandSummary
-  runStatus?: RunStatus
+  analysisCommand: RunTimeCommand | null
+  runCommandSummary: RunCommandSummary | null
+  runStatus: RunStatus
+  stepNumber: number
+  runStartedAt: string | null
+  isMostRecentCommand: boolean
 }
 
 const WRAPPER_STYLE_BY_STATUS: {
@@ -61,22 +68,49 @@ const WRAPPER_STYLE_BY_STATUS: {
     backgroundColor: C_ERROR_LIGHT,
   },
 }
-export function CommandItem(props: CommandItemProps): JSX.Element | null {
-  const { commandOrSummary, runStatus } = props
-  const commandStatus =
-    runStatus !== RUN_STATUS_IDLE && commandOrSummary.status != null
-      ? commandOrSummary.status
-      : 'queued'
 
-  const currentRunId = useCurrentRunId()
+export function CommandItemComponent(
+  props: CommandItemProps
+): JSX.Element | null {
   const {
-    data: commandDetails,
-    refetch: refetchCommandDetails,
-  } = useCommandQuery(currentRunId, commandOrSummary.id)
+    analysisCommand,
+    runCommandSummary,
+    runStatus,
+    stepNumber,
+    runStartedAt,
+    isMostRecentCommand,
+  } = props
+  const { t } = useTranslation('run_details')
 
-  React.useEffect(() => {
-    refetchCommandDetails()
-  }, [commandStatus])
+  let commandStatus: RunCommandSummary['status'] = 'queued' as const
+  if (runStatus !== RUN_STATUS_IDLE && runCommandSummary?.status != null) {
+    commandStatus = runCommandSummary.status
+  }
+  if (
+    isMostRecentCommand &&
+    (commandStatus === 'queued' || commandStatus === 'succeeded')
+  ) {
+    commandStatus = 'running' as const
+  }
+
+  let isComment = false
+  if (
+    analysisCommand != null &&
+    'params' in analysisCommand &&
+    'legacyCommandType' in analysisCommand.params
+  ) {
+    isComment = analysisCommand?.params.legacyCommandType === 'command.COMMENT'
+  } else if (
+    runCommandSummary != null &&
+    runCommandSummary.result != null &&
+    'legacyCommandType' in runCommandSummary.result
+  ) {
+    isComment = runCommandSummary.result.legacyCommandType === 'command.COMMENT'
+  }
+
+  const isPause =
+    analysisCommand?.commandType === 'pause' ||
+    runCommandSummary?.commandType === 'pause'
 
   const WRAPPER_STYLE = css`
     font-size: ${FONT_SIZE_BODY_1};
@@ -91,21 +125,85 @@ export function CommandItem(props: CommandItemProps): JSX.Element | null {
       {commandStatus === 'running' ? (
         <CurrentCommandLabel runStatus={runStatus} />
       ) : null}
-      <Flex flexDirection={DIRECTION_ROW}>
-        {['running', 'failed', 'succeeded'].includes(commandStatus) ? (
+      {commandStatus === 'failed' ? <CommandFailedMessage /> : null}
+      {isComment ? (
+        <Flex
+          textTransform={TEXT_TRANSFORM_UPPERCASE}
+          fontSize={FONT_SIZE_CAPTION}
+          color={C_MED_DARK_GRAY}
+          marginBottom={SPACING_1}
+        >
+          {t('comment_step')}
+        </Flex>
+      ) : null}
+      {isPause ? (
+        <Flex
+          textTransform={TEXT_TRANSFORM_UPPERCASE}
+          fontSize={FONT_SIZE_CAPTION}
+          color={C_MED_DARK_GRAY}
+          marginBottom={SPACING_1}
+        >
+          <Icon
+            name="pause"
+            width={SPACING_3}
+            marginRight={SPACING_2}
+            color={C_DARK_GRAY}
+          />
+          {t('pause_protocol')}
+        </Flex>
+      ) : null}
+      <Flex
+        flexDirection={DIRECTION_ROW}
+        justifyContent={JUSTIFY_SPACE_BETWEEN}
+        alignItems={ALIGN_CENTER}
+        minHeight="1.75rem"
+      >
+        <Flex flexDirection={DIRECTION_ROW} alignItems={ALIGN_CENTER}>
+          <Text
+            fontSize={FONT_SIZE_CAPTION}
+            marginRight={SPACING_3}
+            minWidth={SIZE_1}
+          >
+            {stepNumber}
+          </Text>
+          <CommandText
+            analysisCommand={analysisCommand}
+            runCommand={runCommandSummary}
+          />
+        </Flex>
+        {['running', 'failed', 'succeeded'].includes(commandStatus) &&
+        !isComment ? (
           <CommandTimer
-            commandStartedAt={commandDetails?.data.startedAt}
-            commandCompletedAt={commandDetails?.data.completedAt}
+            commandStartedAt={runCommandSummary?.startedAt ?? null}
+            commandCompletedAt={runCommandSummary?.completedAt ?? null}
+            runStartedAt={runStartedAt}
           />
         ) : null}
-        {commandStatus === 'failed' ? <CommandFailedMessage /> : null}
-        <CommandText
-          commandOrSummary={commandDetails?.data ?? commandOrSummary}
-        />
       </Flex>
     </Flex>
   )
 }
+
+export const CommandItem = React.memo(
+  CommandItemComponent,
+  (prevProps, nextProps) => {
+    const shouldRerender =
+      !isEqual(prevProps.analysisCommand, nextProps.analysisCommand) ||
+      !isEqual(prevProps.runCommandSummary, nextProps.runCommandSummary) ||
+      !isEqual(prevProps.isMostRecentCommand, nextProps.isMostRecentCommand) ||
+      ((([
+        RUN_STATUS_PAUSED,
+        RUN_STATUS_PAUSE_REQUESTED,
+      ] as RunStatus[]).includes(nextProps.runStatus) ||
+        ([
+          RUN_STATUS_PAUSED,
+          RUN_STATUS_PAUSE_REQUESTED,
+        ] as RunStatus[]).includes(prevProps.runStatus)) &&
+        (prevProps.runCommandSummary?.status === 'running' ||
+          nextProps.runCommandSummary?.status === 'running'))
+    return !shouldRerender
+  }
+)
 
 interface CurrentCommandLabelProps {
   runStatus?: RunStatus
@@ -113,6 +211,18 @@ interface CurrentCommandLabelProps {
 
 function CurrentCommandLabel(props: CurrentCommandLabelProps): JSX.Element {
   const { t } = useTranslation('run_details')
+  const getCommandTypeLabel = (): string => {
+    if (
+      props.runStatus === RUN_STATUS_PAUSED ||
+      props.runStatus === RUN_STATUS_PAUSE_REQUESTED
+    ) {
+      return t('current_step_pause')
+    } else if (props.runStatus === RUN_STATUS_BLOCKED_BY_OPEN_DOOR) {
+      return t('door_open_pause')
+    } else {
+      return t('current_step')
+    }
+  }
   return (
     <Text
       fontWeight={FONT_WEIGHT_BOLD}
@@ -121,10 +231,7 @@ function CurrentCommandLabel(props: CurrentCommandLabelProps): JSX.Element {
       textTransform={TEXT_TRANSFORM_UPPERCASE}
       fontSize={FONT_SIZE_CAPTION}
     >
-      {props.runStatus === RUN_STATUS_PAUSED ||
-      props.runStatus === RUN_STATUS_PAUSE_REQUESTED
-        ? t('current_step_pause')
-        : t('current_step')}
+      {getCommandTypeLabel()}
     </Text>
   )
 }

@@ -16,7 +16,7 @@ import {
   RIGHT,
 } from './constants'
 import type { INode } from 'svgson'
-import type { Command } from '../protocol'
+import type { RunTimeCommand } from '../protocol'
 import type { PipetteName } from './pipettes'
 
 // TODO Ian 2019-06-04 split this out into eg ../labware/flowTypes/labwareV1.js
@@ -381,17 +381,24 @@ export interface LoadedLabware {
   loadName: string
   definitionUri: string
   location: {
-    slot: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12
+    slotName: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12
   }
 }
+interface AnalysisError {
+  id: string
+  detail: string
+  errorType: string
+  createdAt: string
+}
+
 export interface CompletedProtocolAnalysis {
   id: string
   status?: 'completed'
   result: 'ok' | 'not-ok' | 'error'
   pipettes: LoadedPipette[]
   labware: LoadedLabware[]
-  commands: Command[]
-  errors: string[]
+  commands: RunTimeCommand[]
+  errors: AnalysisError[]
 }
 
 export interface ResourceFile {
@@ -403,7 +410,7 @@ export interface ProtocolResource {
   createdAt: string
   protocolType: 'json' | 'python'
   metadata: ProtocolMetadata
-  analyses: PendingProtocolAnalysis[] | CompletedProtocolAnalysis[]
+  analyses: Array<PendingProtocolAnalysis | CompletedProtocolAnalysis>
   files: ResourceFile[]
 }
 

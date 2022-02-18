@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 from typing import Optional, Union, List, Dict, Any
 
 from opentrons.types import MountType, DeckSlotName
+from opentrons.hardware_control.modules import ModuleType as ModuleType
 
 
 class EngineStatus(str, Enum):
@@ -14,10 +15,11 @@ class EngineStatus(str, Enum):
 
     IDLE = "idle"
     RUNNING = "running"
-    PAUSE_REQUESTED = "pause-requested"
     PAUSED = "paused"
+    BLOCKED_BY_OPEN_DOOR = "blocked-by-open-door"
     STOP_REQUESTED = "stop-requested"
     STOPPED = "stopped"
+    FINISHING = "finishing"
     FAILED = "failed"
     SUCCEEDED = "succeeded"
 
@@ -97,6 +99,8 @@ class PipetteName(str, Enum):
     P300_MULTI_GEN2 = "p300_multi_gen2"
     P1000_SINGLE = "p1000_single"
     P1000_SINGLE_GEN2 = "p1000_single_gen2"
+    P300_SINGLE_GEN3 = "p300_single_gen3"
+    P1000_SINGLE_GEN3 = "p1000_single_gen3"
 
 
 class LoadedPipette(BaseModel):
@@ -126,6 +130,7 @@ class MotorAxis(str, Enum):
     RIGHT_PLUNGER = "rightPlunger"
 
 
+# TODO(mc, 2022-01-18): move enum to hardware control module
 class ModuleModel(str, Enum):
     """All available modules' models."""
 
@@ -134,6 +139,20 @@ class ModuleModel(str, Enum):
     MAGNETIC_MODULE_V1 = "magneticModuleV1"
     MAGNETIC_MODULE_V2 = "magneticModuleV2"
     THERMOCYCLER_MODULE_V1 = "thermocyclerModuleV1"
+
+    def as_type(self) -> ModuleType:
+        """Get the ModuleType of this model."""
+        if self in [
+            ModuleModel.TEMPERATURE_MODULE_V1,
+            ModuleModel.TEMPERATURE_MODULE_V2,
+        ]:
+            return ModuleType.TEMPERATURE
+        elif self in [ModuleModel.MAGNETIC_MODULE_V1, ModuleModel.MAGNETIC_MODULE_V2]:
+            return ModuleType.MAGNETIC
+        elif self == ModuleModel.THERMOCYCLER_MODULE_V1:
+            return ModuleType.THERMOCYCLER
+
+        assert False, f"Invalid ModuleModel {self}"
 
 
 class ModuleDimensions(BaseModel):
@@ -163,24 +182,29 @@ class ModuleDefinition(BaseModel):
     """Module definition class."""
 
     otSharedSchema: str = Field("module/schemas/2", description="The current schema.")
-    moduleType: str = Field(
-        ..., description="Module type (Temperature/ Magnetic/ Thermocycler)"
+    moduleType: ModuleType = Field(
+        ...,
+        description="Module type (Temperature/Magnetic/Thermocycler)",
     )
-    model: str = Field(..., description="Model name of the module")
+    model: ModuleModel = Field(..., description="Model name of the module")
     labwareOffset: LabwareOffsetVector = Field(
-        ..., description="Labware offset in x, y, z."
+        ...,
+        description="Labware offset in x, y, z.",
     )
     dimensions: ModuleDimensions = Field(..., description="Module dimension")
     calibrationPoint: ModuleCalibrationPoint = Field(
-        ..., description="Calibration point of module."
+        ...,
+        description="Calibration point of module.",
     )
     displayName: str = Field(..., description="Display name.")
     quirks: List[str] = Field(..., description="Module quirks")
     slotTransforms: Dict[str, Any] = Field(
-        ..., description="Dictionary of transforms for each slot."
+        ...,
+        description="Dictionary of transforms for each slot.",
     )
-    compatibleWith: List[str] = Field(
-        ..., description="List of module models this model is compatible with."
+    compatibleWith: List[ModuleModel] = Field(
+        ...,
+        description="List of module models this model is compatible with.",
     )
 
 
@@ -191,8 +215,7 @@ class LoadedModule(BaseModel):
     model: ModuleModel
     location: DeckSlotLocation
     definition: ModuleDefinition
-    # TODO(mc, 2021-11-24): make serial non-optional
-    serial: Optional[str]
+    serialNumber: str
 
 
 class LabwareOffsetLocation(BaseModel):
@@ -200,11 +223,26 @@ class LabwareOffsetLocation(BaseModel):
 
     slotName: DeckSlotName = Field(
         ...,
-        description="The deck slot the offset applies to",
+        description=(
+            "The deck slot where the protocol will load the labware."
+            " Or, if the protocol will load the labware on a module,"
+            " the deck slot where the protocol will load that module."
+        ),
     )
     moduleModel: Optional[ModuleModel] = Field(
         None,
-        description="The module model the labware will be loaded onto, if applicable",
+        description=(
+            "The model of the module that the labware will be loaded onto,"
+            " if applicable."
+            "\n\n"
+            "Because of module compatibility, the model that the protocol requests"
+            " may not beexactly the same"
+            " as what it will find physically connected during execution."
+            " For this labware offset to apply,"
+            " this field must be the *requested* model, not the connected one."
+            " You can retrieve this from a `loadModule` command's `params.model`"
+            " in the protocol's analysis."
+        ),
     )
 
 

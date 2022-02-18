@@ -4,7 +4,6 @@ import {
   C_NEAR_WHITE,
   SPACING_2,
   JUSTIFY_CENTER,
-  SPACING_4,
   Flex,
   RobotWorkSpace,
   LabwareRender,
@@ -34,7 +33,7 @@ import levelWithTip from '../../../assets/images/lpc_level_with_tip.svg'
 import levelWithLabware from '../../../assets/images/lpc_level_with_labware.svg'
 import type { Jog } from '../../../molecules/JogControls/types'
 import type {
-  LabwarePositionCheckCommand,
+  LabwarePositionCheckCreateCommand,
   LabwarePositionCheckMovementCommand,
   LabwarePositionCheckStep,
 } from './types'
@@ -58,7 +57,7 @@ export const LabwarePositionCheckStepDetail = (
   // filter out the TC open lid command as it does not have an associated pipette id
   const stepMovementCommands = selectedStep.commands.filter(
     (
-      command: LabwarePositionCheckCommand
+      command: LabwarePositionCheckCreateCommand
     ): command is LabwarePositionCheckMovementCommand =>
       command.commandType !== 'thermocycler/openLid'
   )
@@ -87,7 +86,6 @@ export const LabwarePositionCheckStepDetail = (
       <Flex
         padding={'0.75rem'}
         justifyContent={JUSTIFY_CENTER}
-        marginTop={SPACING_4}
         boxShadow="1px 1px 1px rgba(0, 0, 0, 0.25)"
         borderRadius="4px"
         backgroundColor={C_NEAR_WHITE}

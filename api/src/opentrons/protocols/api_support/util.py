@@ -19,19 +19,12 @@ from typing import (
 
 from opentrons import types as top_types
 from opentrons.protocols.api_support.types import APIVersion
-from opentrons.hardware_control import (
-    types,
-    SynchronousAdapter,
-    API,
-    HardwareAPILike,
-    ThreadManager,
-)
+from opentrons.hardware_control.types import Axis
 
 if TYPE_CHECKING:
     from opentrons.protocols.context.instrument import AbstractInstrument
     from opentrons.protocol_api.labware import Well, Labware
     from opentrons.protocols.geometry.deck import Deck
-    from opentrons.hardware_control.dev_types import HasLoop
 
 MODULE_LOG = logging.getLogger(__name__)
 
@@ -275,19 +268,19 @@ class AxisMaxSpeeds(UserDict):
     user access by string
     """
 
-    def __getitem__(self, key: Union[str, types.Axis]):
+    def __getitem__(self, key: Union[str, Axis]):
         checked_key = AxisMaxSpeeds._verify_key(key)
         return self.data[checked_key]
 
     @staticmethod
-    def _verify_key(key: Any) -> types.Axis:
-        if isinstance(key, types.Axis):
-            checked_key: Optional[types.Axis] = key
+    def _verify_key(key: Any) -> Axis:
+        if isinstance(key, Axis):
+            checked_key: Optional[Axis] = key
         elif isinstance(key, str):
-            checked_key = types.Axis[key.upper()]
+            checked_key = Axis[key.upper()]
         else:
             checked_key = None
-        if checked_key not in types.Axis.gantry_axes():
+        if checked_key not in Axis.gantry_axes():
             raise KeyError(key)
         return checked_key
 
@@ -303,7 +296,7 @@ class AxisMaxSpeeds(UserDict):
 
         self.data[checked_key] = checked_val
 
-    def __delitem__(self, key: Union[str, types.Axis]):
+    def __delitem__(self, key: Union[str, Axis]):
         checked_key = AxisMaxSpeeds._verify_key(key)
         del self.data[checked_key]
 
@@ -316,56 +309,6 @@ class AxisMaxSpeeds(UserDict):
 
     def items(self):
         return ((k.name, v) for k, v in self.data.items())
-
-
-HardwareToManage = Union[ThreadManager, SynchronousAdapter, "HasLoop"]
-
-
-# TODO: BC 2020-03-02 This class's utility as a utility class is drying up.
-# It's only job is to ensure that the hardware a given
-# ProtocolContext references, is synchronously callable.
-# All internal calls to ProtocolContext __init__
-# or build_using, either pass a ThreadManaged API instance
-# or pass None and expect HardwareManager to create one
-# for them. It seems as though we could replace this
-# with a single if else that covers just those two cases.
-# If that were the case, perhaps it would be clearer to move
-# this logic back into the ProtocolContext definition
-# and hold onto a sync hardware api directly instead of
-# through the ._hw_manager.hardware indirection.
-class HardwareManager:
-    def __init__(self, hardware: Optional[HardwareToManage]):
-        if hardware is None:
-            # TODO AL 20210209. This is a highly dangerous thread leak.
-            self._current = ThreadManager(API.build_hardware_simulator).sync
-        elif isinstance(hardware, SynchronousAdapter):
-            self._current = hardware
-        elif isinstance(hardware, ThreadManager):
-            self._current = hardware.sync
-        else:
-            self._current = SynchronousAdapter(hardware)
-
-    @property
-    def hardware(self):
-        return self._current
-
-    def set_hw(self, hardware):
-        if isinstance(hardware, SynchronousAdapter):
-            self._current = hardware
-        elif isinstance(hardware, ThreadManager):
-            self._current = hardware.sync
-        elif isinstance(hardware, HardwareAPILike):
-            self._current = SynchronousAdapter(hardware)
-        else:
-            raise TypeError(
-                "hardware should be API or synch adapter but is {}".format(hardware)
-            )
-        return self._current
-
-    def reset_hw(self):
-        # TODO AL 20210209. This is a highly dangerous thread leak.
-        self._current = ThreadManager(API.build_hardware_simulator).sync
-        return self._current
 
 
 def clamp_value(

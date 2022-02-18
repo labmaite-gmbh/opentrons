@@ -1,13 +1,11 @@
 import * as React from 'react'
-import { format, parseISO } from 'date-fns'
-import { useSelector } from 'react-redux'
 import { css } from 'styled-components'
-import { Trans, useTranslation } from 'react-i18next'
+import { useTranslation } from 'react-i18next'
 import {
   Icon,
   Text,
   Flex,
-  PrimaryBtn,
+  NewPrimaryBtn,
   FONT_SIZE_BODY_2,
   FONT_WEIGHT_REGULAR,
   SPACING_3,
@@ -19,29 +17,13 @@ import {
   Link,
   DIRECTION_COLUMN,
   ALIGN_CENTER,
-  C_SELECTED_DARK,
   C_WHITE,
   JUSTIFY_CENTER,
   C_BLUE,
   SPACING_1,
-  DIRECTION_ROW,
-  JUSTIFY_SPACE_BETWEEN,
-  FONT_SIZE_CAPTION,
-  FONT_BODY_1_DARK,
-  SecondaryBtn,
-  FONT_SIZE_BODY_1,
-  SPACING_2,
   JUSTIFY_START,
 } from '@opentrons/components'
-import { useProtocolQuery, useRunQuery } from '@opentrons/react-api-client'
-import { getLatestLabwareOffsetCount } from '../ProtocolSetup/LabwarePositionCheck/utils/getLatestLabwareOffsetCount'
-import { useProtocolDetails } from '../RunDetails/hooks'
-import { getConnectedRobotName } from '../../redux/robot/selectors'
-import { Divider } from '../../atoms/structure'
-import { useMostRecentRunId } from './hooks/useMostRecentRunId'
-import { RerunningProtocolModal } from './RerunningProtocolModal'
-import { useCloneRun } from './hooks'
-import type { State } from '../../redux/types'
+import { LastRun } from './LastRun'
 
 const PROTOCOL_LIBRARY_URL = 'https://protocols.opentrons.com'
 const PROTOCOL_DESIGNER_URL = 'https://designer.opentrons.com'
@@ -62,7 +44,7 @@ const DROP_ZONE_STYLES = css`
   background-color: ${C_WHITE};
 `
 const DRAG_OVER_STYLES = css`
-  background-color: ${C_SELECTED_DARK};
+  background-color: ${C_BLUE};
   color: ${C_WHITE};
 `
 
@@ -77,33 +59,11 @@ export interface UploadInputProps {
 
 export function UploadInput(props: UploadInputProps): JSX.Element | null {
   const { t } = useTranslation('protocol_info')
-  const mostRecentRunId = useMostRecentRunId()
-  const runQuery = useRunQuery(mostRecentRunId)
-  const mostRecentRun = runQuery.data?.data
-  const mostRecentProtocolInfo = useProtocolQuery(
-    (mostRecentRun?.protocolId as string) ?? null
-  )
-  const mostRecentProtocol = mostRecentProtocolInfo?.data?.data
-  const protocolData = useProtocolDetails()
-  //  If mostRecentRun is null, the CTA that uses cloneRun won't appear so this will never be reached
-  const cloneMostRecentRun = useCloneRun(
-    mostRecentRunId != null ? mostRecentRunId : null
-  )
-  const robotName = useSelector((state: State) => getConnectedRobotName(state))
+
   const fileInput = React.useRef<HTMLInputElement>(null)
   const [isFileOverDropZone, setIsFileOverDropZone] = React.useState<boolean>(
     false
   )
-  const [rerunningProtocolModal, showRerunningProtocolModal] = React.useState(
-    false
-  )
-  const labwareOffsets = mostRecentRun?.labwareOffsets
-  const protocolName = protocolData.displayName
-  const mostRecentRunFileName =
-    mostRecentProtocol != null && mostRecentProtocol.files != null
-      ? mostRecentProtocol.files.find(file => file.role === 'main')?.name
-      : null
-
   const handleDrop: React.DragEventHandler<HTMLLabelElement> = e => {
     e.preventDefault()
     e.stopPropagation()
@@ -142,8 +102,6 @@ export function UploadInput(props: UploadInputProps): JSX.Element | null {
       `
     : DROP_ZONE_STYLES
 
-  const labwareOffsetCount = getLatestLabwareOffsetCount(labwareOffsets ?? [])
-
   return (
     <Flex
       height="100%"
@@ -151,19 +109,13 @@ export function UploadInput(props: UploadInputProps): JSX.Element | null {
       justifyContent={JUSTIFY_CENTER}
       alignItems={ALIGN_CENTER}
     >
-      {rerunningProtocolModal && (
-        <RerunningProtocolModal
-          onCloseClick={() => showRerunningProtocolModal(false)}
-        />
-      )}
-      <PrimaryBtn
+      <NewPrimaryBtn
         onClick={handleClick}
         marginBottom={SPACING_4}
-        backgroundColor={C_BLUE}
         id={'UploadInput_protocolUploadButton'}
       >
         {t('choose_file')}
-      </PrimaryBtn>
+      </NewPrimaryBtn>
 
       <label
         data-testid="file_drop_zone"
@@ -192,107 +144,7 @@ export function UploadInput(props: UploadInputProps): JSX.Element | null {
           onChange={onChange}
         />
       </label>
-      {mostRecentRun == null ? null : (
-        <Flex flexDirection={DIRECTION_COLUMN} width={'80%'}>
-          <Divider marginY={SPACING_3} />
-          <Flex
-            justifyContent={JUSTIFY_SPACE_BETWEEN}
-            flex={'auto'}
-            marginBottom={SPACING_2}
-          >
-            <Trans
-              t={t}
-              i18nKey="robot_name_last_run"
-              values={{ robot_name: robotName }}
-            />
-            <Link
-              role={'link'}
-              fontSize={FONT_SIZE_BODY_1}
-              color={C_BLUE}
-              onClick={() => showRerunningProtocolModal(true)}
-              id={'RerunningProtocol_Modal'}
-              data-testid={'RerunningProtocol_ModalLink'}
-            >
-              {t('rerunning_protocol_modal_title')}
-            </Link>
-          </Flex>
-          <Flex
-            flexDirection={DIRECTION_ROW}
-            alignItems={ALIGN_CENTER}
-            marginBottom={SPACING_4}
-          >
-            <Flex
-              flex={'auto'}
-              flexDirection={DIRECTION_COLUMN}
-              justifyContent={JUSTIFY_CENTER}
-            >
-              <Text
-                marginBottom={SPACING_1}
-                color={C_MED_GRAY}
-                fontSize={FONT_SIZE_CAPTION}
-              >
-                {t('protocol_name_title')}
-              </Text>
-              <Flex css={FONT_BODY_1_DARK}>
-                {protocolName != null ? protocolName : mostRecentRunFileName}
-              </Flex>
-            </Flex>
-            <Flex
-              flex={'auto'}
-              flexDirection={DIRECTION_COLUMN}
-              justifyContent={JUSTIFY_CENTER}
-            >
-              <Text
-                marginBottom={SPACING_1}
-                color={C_MED_GRAY}
-                fontSize={FONT_SIZE_CAPTION}
-              >
-                {t('run_timestamp_title')}
-              </Text>
-              <Flex css={FONT_BODY_1_DARK} flexDirection={DIRECTION_ROW}>
-                {format(
-                  parseISO(mostRecentRun.createdAt),
-                  'yyyy-MM-dd pp xxxxx'
-                )}
-              </Flex>
-            </Flex>
-            <Flex
-              flex={'auto'}
-              flexDirection={DIRECTION_COLUMN}
-              justifyContent={JUSTIFY_CENTER}
-            >
-              <Text
-                marginBottom={SPACING_1}
-                color={C_MED_GRAY}
-                fontSize={FONT_SIZE_CAPTION}
-              >
-                {t('labware_offset_data_title')}
-              </Text>
-              <Flex css={FONT_BODY_1_DARK}>
-                {labwareOffsetCount === 0 ? (
-                  <Text>{t('no_labware_offset_data')}</Text>
-                ) : (
-                  <Trans
-                    t={t}
-                    i18nKey="labware_offsets_info"
-                    values={{ number: labwareOffsetCount }}
-                  />
-                )}
-              </Flex>
-            </Flex>
-            <Flex>
-              <SecondaryBtn
-                onClick={cloneMostRecentRun}
-                color={C_BLUE}
-                id={'UploadInput_runAgainButton'}
-              >
-                {t('run_again')}
-              </SecondaryBtn>
-            </Flex>
-          </Flex>
-          <Divider />
-        </Flex>
-      )}
+      <LastRun />
       <Text
         role="complementary"
         as="h4"

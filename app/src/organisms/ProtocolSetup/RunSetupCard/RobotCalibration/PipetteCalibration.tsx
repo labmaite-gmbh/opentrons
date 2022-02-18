@@ -6,7 +6,7 @@ import {
   Text,
   Flex,
   Link,
-  PrimaryBtn,
+  NewPrimaryBtn,
   SPACING_3,
   ALIGN_CENTER,
   DIRECTION_ROW,
@@ -28,7 +28,6 @@ import { CalibrationItem } from './CalibrationItem'
 
 import type { PipetteInfo } from '../hooks/useCurrentRunPipetteInfoByMount'
 
-const pipettesPageUrl = `/robots/opentrons-dev/instruments`
 const inexactPipetteSupportArticle =
   'https://support.opentrons.com/en/articles/3450143-gen2-pipette-compatibility'
 
@@ -44,6 +43,7 @@ export function PipetteCalibration(props: Props): JSX.Element {
   const { t } = useTranslation('protocol_setup')
   const [showCalBlockModal, setShowCalBlockModal] = React.useState(false)
   const configHasCalibrationBlock = useSelector(Config.getHasCalibrationBlock)
+  const pipettesPageUrl = `/robots/${robotName}/instruments`
 
   const [
     startPipetteOffsetCalibration,
@@ -115,14 +115,13 @@ export function PipetteCalibration(props: Props): JSX.Element {
         >
           {t('pipette_missing')}
         </Text>
-        <PrimaryBtn
+        <NewPrimaryBtn
           as={RRDLink}
           to={pipettesPageUrl}
-          backgroundColor={C_BLUE}
           id={'PipetteCalibration_attachPipetteButton'}
         >
           {t('attach_pipette_cta')}
-        </PrimaryBtn>
+        </NewPrimaryBtn>
       </Flex>
     )
   } else {
@@ -130,13 +129,13 @@ export function PipetteCalibration(props: Props): JSX.Element {
       <>
         <Flex flexDirection={DIRECTION_ROW} alignItems={ALIGN_CENTER}>
           {pipetteMismatchInfo}
-          <PrimaryBtn
+          <NewPrimaryBtn
             backgroundColor={C_BLUE}
             onClick={() => startPipetteOffsetCalibrationBlockModal(null)}
             id={'PipetteCalibration_calibratePipetteButton'}
           >
             {t('calibrate_now_cta')}
-          </PrimaryBtn>
+          </NewPrimaryBtn>
         </Flex>
         {PipetteOffsetCalibrationWizard}
         {showCalBlockModal && (

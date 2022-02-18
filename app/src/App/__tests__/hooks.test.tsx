@@ -1,8 +1,10 @@
 import * as React from 'react'
+import { MemoryRouter } from 'react-router-dom'
 import { renderHook } from '@testing-library/react-hooks'
 import { createStore } from 'redux'
 import { I18nextProvider } from 'react-i18next'
 import { Provider } from 'react-redux'
+import { format, parseISO } from 'date-fns'
 
 import { i18n } from '../../i18n'
 import {
@@ -12,8 +14,8 @@ import {
   getDeckCalibrationOk,
 } from '../../redux/nav'
 import { getConnectedRobot } from '../../redux/discovery'
-import { useNavLocations, useRunLocation } from '../hooks'
-import { useCurrentProtocolRun } from '../../organisms/ProtocolUpload/hooks'
+import { useNavLocations, usePathCrumbs, useRunLocation } from '../hooks'
+import { useIsProtocolRunLoaded } from '../../organisms/ProtocolUpload/hooks'
 
 import type { Store } from 'redux'
 import type { State } from '../../redux/types'
@@ -38,8 +40,8 @@ const mockGetDeckCalibrationOk = getDeckCalibrationOk as jest.MockedFunction<
 const mockGetNavbarLocations = getNavbarLocations as jest.MockedFunction<
   typeof getNavbarLocations
 >
-const mockUseCurrentProtocolRun = useCurrentProtocolRun as jest.MockedFunction<
-  typeof useCurrentProtocolRun
+const mockUseIsCurrentRunLoaded = useIsProtocolRunLoaded as jest.MockedFunction<
+  typeof useIsProtocolRunLoaded
 >
 
 describe('useRunLocation', () => {
@@ -58,10 +60,7 @@ describe('useRunLocation', () => {
       mockGetConnectedRobotPipettesMatch.mockReturnValue(true)
       mockGetConnectedRobotPipettesCalibrated.mockReturnValue(true)
       mockGetDeckCalibrationOk.mockReturnValue(true)
-      mockUseCurrentProtocolRun.mockReturnValue({
-        protocolRecord: {},
-        runRecord: {},
-      } as any)
+      mockUseIsCurrentRunLoaded.mockReturnValue(true)
     })
     afterEach(() => {
       jest.resetAllMocks()
@@ -73,10 +72,7 @@ describe('useRunLocation', () => {
       expect(disabledReason).toBe('Please connect to a robot to proceed')
     })
     it('should tell user to load a protocol', () => {
-      mockUseCurrentProtocolRun.mockReturnValue({
-        protocolRecord: null,
-        runRecord: null,
-      } as any)
+      mockUseIsCurrentRunLoaded.mockReturnValue(false)
       const { result } = renderHook(useRunLocation, { wrapper })
       const { disabledReason } = result.current
       expect(disabledReason).toBe('Please load a protocol to proceed')
@@ -112,12 +108,48 @@ describe('useRunLocation', () => {
       mockGetConnectedRobotPipettesCalibrated.mockReturnValue(true)
       mockGetDeckCalibrationOk.mockReturnValue(true)
       mockGetNavbarLocations.mockReturnValue([0, 1, 2, 3, 4] as any)
-      mockUseCurrentProtocolRun.mockReturnValue({
-        protocolRecord: {},
-        runRecord: {},
-      } as any)
+      mockUseIsCurrentRunLoaded.mockReturnValue(true)
       const { result } = renderHook(useNavLocations, { wrapper })
       expect(result.current.length).toBe(4)
     })
+  })
+})
+
+describe('usePathCrumbs', () => {
+  let wrapper: React.FunctionComponent<{}>
+  beforeEach(() => {
+    wrapper = ({ children }) => (
+      <I18nextProvider i18n={i18n}>
+        <MemoryRouter
+          initialEntries={[
+            '/devices/litter-hood/protocol-runs/2022-02-10T20:25:42.662800+00:00',
+          ]}
+          initialIndex={0}
+        >
+          {children}
+        </MemoryRouter>
+      </I18nextProvider>
+    )
+  })
+  afterEach(() => {
+    jest.resetAllMocks()
+  })
+
+  it('should return a mapped path crumb', () => {
+    const timeStampISO = '2022-02-10T20:25:42.662800+00:00'
+    const formattedTimeStamp = format(
+      parseISO(timeStampISO),
+      'MM/dd/yyyy HH:mm:ss'
+    )
+    const { result } = renderHook(usePathCrumbs, { wrapper })
+    expect(result.current).toStrictEqual([
+      { pathSegment: 'devices', crumbName: 'Devices' },
+      { pathSegment: 'litter-hood', crumbName: 'litter-hood' },
+      { pathSegment: 'protocol-runs', crumbName: 'Protocol Runs' },
+      {
+        pathSegment: timeStampISO,
+        crumbName: formattedTimeStamp,
+      },
+    ])
   })
 })

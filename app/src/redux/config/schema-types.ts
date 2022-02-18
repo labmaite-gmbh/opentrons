@@ -6,7 +6,10 @@ export type UpdateChannel = 'latest' | 'beta' | 'alpha'
 
 export type DiscoveryCandidates = string | string[]
 
-export type DevInternalFlag = 'allPipetteConfig' | 'enableBundleUpload'
+export type DevInternalFlag =
+  | 'allPipetteConfig'
+  | 'enableBundleUpload'
+  | 'hierarchyReorganization'
 
 export type FeatureFlags = Partial<Record<DevInternalFlag, boolean | undefined>>
 
@@ -60,7 +63,7 @@ export interface ConfigV0 {
   support: {
     userId: string
     createdAt: number
-    name: string
+    name: string | null
     email: string | null | undefined
   }
 
@@ -104,4 +107,11 @@ export interface ConfigV3 extends Omit<ConfigV2, 'version' | 'support'> {
   }
 }
 
-export type Config = ConfigV3
+export interface ConfigV4 extends Omit<ConfigV3, 'version' | 'labware'> {
+  version: 4
+  labware: ConfigV3['labware'] & {
+    showLabwareOffsetCodeSnippets: boolean
+  }
+}
+
+export type Config = ConfigV4

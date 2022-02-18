@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { Trans, useTranslation } from 'react-i18next'
 import {
-  PrimaryBtn,
+  NewPrimaryBtn,
   Text,
   Flex,
   Box,
@@ -12,14 +12,12 @@ import {
   JUSTIFY_SPACE_BETWEEN,
   JUSTIFY_CENTER,
   ALIGN_CENTER,
-  C_BLUE,
   SPACING_2,
   SPACING_3,
-  SPACING_4,
   FONT_SIZE_BODY_2,
   SPACING_6,
 } from '@opentrons/components'
-import { useCurrentProtocolRun } from '../../ProtocolUpload/hooks'
+import { useCurrentRun } from '../../ProtocolUpload/hooks'
 import { getLatestLabwareOffsetCount } from '../LabwarePositionCheck/utils/getLatestLabwareOffsetCount'
 import { SectionList } from './SectionList'
 import { DeckMap } from './DeckMap'
@@ -34,8 +32,8 @@ export const IntroScreen = (props: {
   const labwareIdsBySection = useLabwareIdsBySection()
   const { t } = useTranslation(['labware_position_check', 'shared'])
 
-  const currentProtocolRun = useCurrentProtocolRun()
-  const currentRunData = currentProtocolRun.runRecord?.data
+  const runRecord = useCurrentRun()
+  const currentRunData = runRecord?.data
   const labwareOffsetCount = getLatestLabwareOffsetCount(
     currentRunData?.labwareOffsets ?? []
   )
@@ -88,22 +86,21 @@ export const IntroScreen = (props: {
             secondaryPipetteMount={secondaryPipetteMount}
           />
         </Flex>
-        <Box width="60%" padding={SPACING_3}>
+        <Box width="60%" padding={SPACING_2}>
           <DeckMap labwareIdsToHighlight={labwareIdsToHighlight} />
         </Box>
       </Flex>
-      <Flex justifyContent={JUSTIFY_CENTER} marginBottom={SPACING_4}>
-        <PrimaryBtn
+      <Flex justifyContent={JUSTIFY_CENTER} marginBottom={SPACING_3}>
+        <NewPrimaryBtn
           title={t('start_position_check', {
             initial_labware_slot: firstTiprackSlot,
           })}
-          backgroundColor={C_BLUE}
           onClick={props.beginLPC}
         >
           {t('start_position_check', {
             initial_labware_slot: firstTiprackSlot,
           })}
-        </PrimaryBtn>
+        </NewPrimaryBtn>
       </Flex>
     </Box>
   )

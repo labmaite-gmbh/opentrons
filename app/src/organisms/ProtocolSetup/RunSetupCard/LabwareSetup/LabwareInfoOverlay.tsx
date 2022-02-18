@@ -18,8 +18,8 @@ import {
   JUSTIFY_FLEX_END,
   FONT_SIZE_CAPTION,
 } from '@opentrons/components'
-import { useCurrentProtocolRun } from '../../../ProtocolUpload/hooks'
-import { getLabwareLocation } from '../../utils/getLabwareLocation'
+import { useCurrentRun } from '../../../ProtocolUpload/hooks'
+import { getLabwareOffsetLocation } from '../../utils/getLabwareOffsetLocation'
 import { useProtocolDetails } from '../../../RunDetails/hooks'
 import { getLabwareDefinitionUri } from '../../utils/getLabwareDefinitionUri'
 
@@ -38,21 +38,29 @@ const labwareDisplayNameStyle = css`
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
 `
-const LabwareInfo = (props: LabwareInfoProps): JSX.Element => {
+const LabwareInfo = (props: LabwareInfoProps): JSX.Element | null => {
   const { displayName, labwareId } = props
   const { t } = useTranslation('protocol_setup')
   const { protocolData } = useProtocolDetails()
+  const runRecord = useCurrentRun()
+  // protocolData should never be null as we don't render the `ProtocolSetup` unless we have an analysis
+  // but we're experiencing a zombie children issue, see https://github.com/Opentrons/opentrons/pull/9091
+  if (protocolData == null) {
+    return null
+  }
+
   const labwareDefinitionUri = getLabwareDefinitionUri(
     labwareId,
-    protocolData?.labware
+    protocolData.labware,
+    protocolData.labwareDefinitions
   )
-  const { runRecord } = useCurrentProtocolRun()
-  const labwareLocation = getLabwareLocation(
+  const labwareLocation = getLabwareOffsetLocation(
     labwareId,
-    protocolData?.commands ?? []
+    protocolData?.commands ?? [],
+    protocolData.modules
   )
 
-  const labwareOffsets = runRecord?.data.labwareOffsets ?? []
+  const labwareOffsets = runRecord?.data?.labwareOffsets ?? []
   const mostRecentLabwareOffsets = uniqBy<LabwareOffset>(
     labwareOffsets.sort(
       (a, b) =>
@@ -60,9 +68,9 @@ const LabwareInfo = (props: LabwareInfoProps): JSX.Element => {
     ),
     offset => {
       const locationKey =
-        'slotName' in offset.location
-          ? offset.location?.slotName
-          : offset.location.moduleId
+        offset.location.moduleModel != null
+          ? `${offset.location.moduleModel}_${offset.location.slotName}`
+          : offset.location.slotName
       return `${offset.definitionUri}_${locationKey}`
     }
   )

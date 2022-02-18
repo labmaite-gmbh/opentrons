@@ -22,6 +22,7 @@ import {
   Text,
   Link,
   SPACING_1,
+  C_NEAR_WHITE,
 } from '@opentrons/components'
 
 import { useRunStatus } from '../RunTimeControl/hooks'
@@ -34,7 +35,9 @@ const feedbackFormLink =
   'https://docs.google.com/forms/d/e/1FAIpQLSd6oSV82IfgzSi5t_FP6n_pB_Y8wPGmAgFHsiiFho9qhxr-UQ/viewform'
 
 export function ProtocolSetup(): JSX.Element {
-  const [showLPCSuccessToast, setShowLPCSuccessToast] = React.useState(false)
+  const [showLPCSuccessToast, setIsShowingLPCSuccessToast] = React.useState(
+    false
+  )
   const { t } = useTranslation(['protocol_setup'])
 
   const runStatus = useRunStatus()
@@ -56,9 +59,7 @@ export function ProtocolSetup(): JSX.Element {
     alertTitle = `${t('protocol_run_complete')} ${t('protocol_can_be_closed')}`
   } else if (runStatus === RUN_STATUS_FAILED) {
     alertType = 'error'
-    alertTitle = `${t('protocol_run_failed')} ${t(
-      'recalibrating_not_available'
-    )}`
+    alertTitle = `${t('protocol_run_failed')} `
   } else if (
     runStatus === RUN_STATUS_STOPPED ||
     runStatus === RUN_STATUS_STOP_REQUESTED
@@ -77,20 +78,22 @@ export function ProtocolSetup(): JSX.Element {
         </Box>
       ) : null}
       <Flex
+        backgroundColor={C_NEAR_WHITE}
         flexDirection={DIRECTION_COLUMN}
         padding={`${SPACING_1} ${SPACING_3} ${SPACING_3} ${SPACING_3}`}
       >
-        {showLPCSuccessToast && (
-          <LabwareOffsetSuccessToast
-            onCloseClick={() => setShowLPCSuccessToast(false)}
-          />
-        )}
-        <MetadataCard />
         <LPCSuccessToastContext.Provider
           value={{
-            setShowLPCSuccessToast: () => setShowLPCSuccessToast(true),
+            setIsShowingLPCSuccessToast: (isShowing: boolean) =>
+              setIsShowingLPCSuccessToast(isShowing),
           }}
         >
+          {showLPCSuccessToast && (
+            <LabwareOffsetSuccessToast
+              onCloseClick={() => setIsShowingLPCSuccessToast(false)}
+            />
+          )}
+          <MetadataCard />
           <RunSetupCard />
         </LPCSuccessToastContext.Provider>
         <Text

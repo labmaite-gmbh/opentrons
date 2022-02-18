@@ -1,26 +1,26 @@
 """Class that schedules motion on can bus."""
 import asyncio
 import logging
-from opentrons_hardware.drivers.can_bus import NodeId
-from opentrons_hardware.drivers.can_bus.can_messenger import (
-    CanMessenger,
-    MessageListener,
-)
-from opentrons_hardware.drivers.can_bus.messages import MessageDefinition
-from opentrons_hardware.drivers.can_bus.messages.message_definitions import (
+from typing import List, Set, Tuple
+
+from opentrons_ot3_firmware import ArbitrationId
+from opentrons_ot3_firmware.constants import NodeId
+from opentrons_hardware.drivers.can_bus.can_messenger import CanMessenger
+from opentrons_ot3_firmware.messages import MessageDefinition
+from opentrons_ot3_firmware.messages.message_definitions import (
     ClearAllMoveGroupsRequest,
     AddLinearMoveRequest,
     MoveCompleted,
     ExecuteMoveGroupRequest,
 )
-from opentrons_hardware.drivers.can_bus.messages.payloads import (
+from opentrons_ot3_firmware.messages.payloads import (
     AddLinearMoveRequestPayload,
     ExecuteMoveGroupRequestPayload,
     EmptyPayload,
 )
-from opentrons_hardware.hardware_control.constants import interrupts_per_sec
+from .constants import interrupts_per_sec
 from opentrons_hardware.hardware_control.motion import MoveGroups
-from opentrons_hardware.utils import UInt8Field, UInt32Field, Int32Field
+from opentrons_ot3_firmware.utils import UInt8Field, UInt32Field, Int32Field
 
 
 log = logging.getLogger(__name__)
@@ -72,9 +72,21 @@ class MoveGroupRunner:
                                 duration=UInt32Field(
                                     int(step.duration_sec * interrupts_per_sec)
                                 ),
-                                acceleration=Int32Field(0),
+                                acceleration=Int32Field(
+                                    int(
+                                        (
+                                            step.acceleration_mm_sec_sq
+                                            / interrupts_per_sec
+                                            / interrupts_per_sec
+                                        )
+                                        * (2**31)
+                                    )
+                                ),
                                 velocity=Int32Field(
-                                    int(interrupts_per_sec * step.velocity_mm_sec)
+                                    int(
+                                        (step.velocity_mm_sec / interrupts_per_sec)
+                                        * (2**31)
+                                    )
                                 ),
                             )
                         ),
@@ -90,27 +102,40 @@ class MoveGroupRunner:
             can_messenger.remove_listener(scheduler)
 
 
-class MoveScheduler(MessageListener):
+class MoveScheduler:
     """A message listener that manages the sending of execute move group messages."""
 
     def __init__(self, move_groups: MoveGroups) -> None:
         """Constructor."""
         # For each move group create a set identifying the node and seq id.
-        self._moves = []
+        self._moves: List[Set[Tuple[int, int]]] = []
+        self._durations: List[float] = []
         for move_group in move_groups:
             move_set = set()
+            duration = 0.0
             for seq_id, move in enumerate(move_group):
                 move_set.update(set((k.value, seq_id) for k in move.keys()))
+                duration += list(move.values())[0].duration_sec
             self._moves.append(move_set)
+            self._durations.append(duration)
+        log.info(f"Move scheduler running for groups {move_groups}")
 
         self._event = asyncio.Event()
 
-    def on_message(self, message: MessageDefinition) -> None:
+    def __call__(
+        self, message: MessageDefinition, arbitration_id: ArbitrationId
+    ) -> None:
         """Incoming message handler."""
         if isinstance(message, MoveCompleted):
             seq_id = message.payload.seq_id.value
-            node_id = message.payload.node_id.value
             group_id = message.payload.group_id.value
+            node_id = arbitration_id.parts.originating_node_id
+            log.info(
+                f"Received completion for {node_id} group {group_id} seq {seq_id}"
+                ", which "
+                f"{'is' if (node_id, seq_id) in self._moves[group_id] else 'isn''t'}"
+                " in group"
+            )
             self._moves[group_id].remove((node_id, seq_id))
             if not self._moves[group_id]:
                 log.info(f"Move group {group_id} has completed.")
@@ -122,7 +147,6 @@ class MoveScheduler(MessageListener):
             self._event.clear()
 
             log.info(f"Executing move group {group_id}.")
-
             await can_messenger.send(
                 node_id=NodeId.broadcast,
                 message=ExecuteMoveGroupRequest(
@@ -136,4 +160,9 @@ class MoveScheduler(MessageListener):
                 ),
             )
 
-            await self._event.wait()
+            try:
+                await asyncio.wait_for(
+                    self._event.wait(), self._durations[group_id] * 1.1
+                )
+            except asyncio.TimeoutError:
+                log.warning("Move set timed out")

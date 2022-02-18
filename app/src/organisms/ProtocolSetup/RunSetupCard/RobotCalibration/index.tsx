@@ -3,13 +3,12 @@ import { useDispatch } from 'react-redux'
 import { useTranslation } from 'react-i18next'
 import {
   Text,
-  PrimaryBtn,
+  NewPrimaryBtn,
   useHoverTooltip,
   Tooltip,
   SPACING_2,
   SPACING_3,
   ALIGN_CENTER,
-  C_BLUE,
   FONT_WEIGHT_SEMIBOLD,
   FONT_HEADER_THIN,
   Box,
@@ -19,6 +18,7 @@ import * as PipetteOffset from '../../../../redux/calibration/pipette-offset'
 import * as Pipettes from '../../../../redux/pipettes'
 import * as TipLength from '../../../../redux/calibration/tip-length'
 import * as PipetteConstants from '../../../../redux/pipettes/constants'
+import { useTrackEvent } from '../../../../redux/analytics'
 import { DeckCalibration } from './DeckCalibration'
 import { CalibrationItem } from './CalibrationItem'
 import { PipetteCalibration } from './PipetteCalibration'
@@ -46,6 +46,7 @@ export function RobotCalibration(props: Props): JSX.Element {
       ? 'proceed_to_module_setup_step'
       : 'proceed_to_labware_setup_step'
   const [targetProps, tooltipProps] = useHoverTooltip()
+  const trackEvent = useTrackEvent()
 
   const dispatch = useDispatch<Dispatch>()
   React.useEffect(() => {
@@ -140,15 +141,20 @@ export function RobotCalibration(props: Props): JSX.Element {
       </div>
       <Divider marginY={SPACING_3} />
       <Box textAlign={ALIGN_CENTER}>
-        <PrimaryBtn
+        <NewPrimaryBtn
           disabled={!calibrationStatus.complete}
-          onClick={() => expandStep(nextStep)}
-          backgroundColor={C_BLUE}
+          onClick={() => {
+            expandStep(nextStep)
+            trackEvent({
+              name: nextStepButtonKey,
+              properties: {},
+            })
+          }}
           {...targetProps}
           id={'RobotCalStep_proceedButton'}
         >
           {t(nextStepButtonKey)}
-        </PrimaryBtn>
+        </NewPrimaryBtn>
         {calibrationStatus.reason !== undefined && (
           <Tooltip {...tooltipProps}>{t(calibrationStatus.reason)}</Tooltip>
         )}

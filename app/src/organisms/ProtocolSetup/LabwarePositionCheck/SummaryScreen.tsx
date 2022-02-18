@@ -3,14 +3,14 @@ import isEqual from 'lodash/isEqual'
 import { useTranslation } from 'react-i18next'
 import {
   ALIGN_START,
-  C_BLUE,
   DIRECTION_COLUMN,
   Flex,
   FONT_WEIGHT_SEMIBOLD,
   JUSTIFY_CENTER,
   JUSTIFY_START,
-  PrimaryBtn,
+  NewPrimaryBtn,
   SPACING_3,
+  SPACING_2,
   SPACING_4,
   Text,
   TEXT_TRANSFORM_UPPERCASE,
@@ -18,7 +18,7 @@ import {
 import { IDENTITY_VECTOR } from '@opentrons/shared-data'
 import { useCreateLabwareOffsetMutation } from '@opentrons/react-api-client'
 import { useProtocolDetails } from '../../RunDetails/hooks'
-import { useCurrentProtocolRun } from '../../ProtocolUpload/hooks'
+import { useCurrentRunId } from '../../ProtocolUpload/hooks'
 import { useLPCSuccessToast } from '../hooks'
 import { DeckMap } from './DeckMap'
 import { SectionList } from './SectionList'
@@ -37,16 +37,17 @@ export const SummaryScreen = (props: {
   const introInfo = useIntroInfo()
   const { protocolData } = useProtocolDetails()
   useLabwareOffsets(savePositionCommandData, protocolData as ProtocolFile<{}>)
-    .then(offsets => setLabwareOffsets(offsets))
+    .then(offsets => {
+      labwareOffsets.length === 0 && setLabwareOffsets(offsets)
+    })
     .catch((e: Error) =>
       console.error(`error getting labware offsetsL ${e.message}`)
     )
   const { createLabwareOffset } = useCreateLabwareOffsetMutation()
-  const { runRecord } = useCurrentProtocolRun()
-  const { setShowLPCSuccessToast } = useLPCSuccessToast()
+  const runId = useCurrentRunId()
+  const { setIsShowingLPCSuccessToast } = useLPCSuccessToast()
 
-  if (introInfo == null) return null
-  if (protocolData == null) return null
+  if (runId == null || introInfo == null || protocolData == null) return null
   const labwareIds = Object.keys(protocolData.labware)
   const { sections, primaryPipetteMount, secondaryPipetteMount } = introInfo
 
@@ -55,10 +56,10 @@ export const SummaryScreen = (props: {
       labwareOffsets.forEach(labwareOffset => {
         if (!isEqual(labwareOffset.vector, IDENTITY_VECTOR)) {
           createLabwareOffset({
-            runId: runRecord?.data.id as string,
+            runId: runId,
             data: {
               definitionUri: labwareOffset.labwareDefinitionUri,
-              location: labwareOffset.labwareLocation,
+              location: labwareOffset.labwareOffsetLocation,
               vector: labwareOffset.vector,
             },
           }).catch((e: Error) => {
@@ -84,32 +85,34 @@ export const SummaryScreen = (props: {
       </Text>
       <Flex justifyContent={JUSTIFY_START} alignItems={ALIGN_START}>
         <Flex flex={'1 1 10%'} flexDirection={DIRECTION_COLUMN}>
-          <SectionList
-            primaryPipetteMount={primaryPipetteMount}
-            secondaryPipetteMount={secondaryPipetteMount}
-            sections={sections}
-            completedSections={sections}
-          />
-
-          <DeckMap completedLabwareIdSections={labwareIds} />
+          <Flex paddingLeft={SPACING_4}>
+            <SectionList
+              primaryPipetteMount={primaryPipetteMount}
+              secondaryPipetteMount={secondaryPipetteMount}
+              sections={sections}
+              completedSections={sections}
+            />
+          </Flex>
+          <Flex paddingTop={SPACING_2}>
+            <DeckMap completedLabwareIds={labwareIds} />
+          </Flex>
         </Flex>
         <Flex flex={'1 1 45%'}>
           <LabwareOffsetsSummary offsetData={labwareOffsets} />
         </Flex>
       </Flex>
       <Flex justifyContent={JUSTIFY_CENTER} marginBottom={SPACING_4}>
-        <PrimaryBtn
+        <NewPrimaryBtn
           title={t('close_and_apply_offset_data')}
-          backgroundColor={C_BLUE}
           id={'Lpc_summaryScreen_applyOffsetButton'}
           onClick={() => {
             applyLabwareOffsets()
-            setShowLPCSuccessToast()
+            setIsShowingLPCSuccessToast(true)
             props.onCloseClick()
           }}
         >
           {t('close_and_apply_offset_data')}
-        </PrimaryBtn>
+        </NewPrimaryBtn>
       </Flex>
     </Flex>
   )

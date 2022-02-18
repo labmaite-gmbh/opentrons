@@ -5,7 +5,11 @@ reactions in objects that subscribe to the pipeline, like the StateStore.
 """
 from dataclasses import dataclass
 from datetime import datetime
+from enum import Enum
 from typing import Optional, Union
+
+from opentrons.protocols.models import LabwareDefinition
+from opentrons.hardware_control.types import HardwareEvent
 
 from ..commands import Command, CommandCreate
 from ..errors import ProtocolEngineError
@@ -17,14 +21,36 @@ class PlayAction:
     """Start or resume processing commands in the engine."""
 
 
+class PauseSource(str, Enum):
+    """The source of a PauseAction.
+
+    Attributes:
+        CLIENT: the pause came externally, from the engine client.
+        PROTOCOL: the pause came from the protocol itself.
+    """
+
+    CLIENT = "client"
+    PROTOCOL = "protocol"
+
+
 @dataclass(frozen=True)
 class PauseAction:
     """Pause processing commands in the engine."""
 
+    source: PauseSource
+
 
 @dataclass(frozen=True)
-class StopErrorDetails:
-    """Error details for the payload of a StopAction."""
+class StopAction:
+    """Stop the current engine execution.
+
+    After a StopAction, the engine status will be marked as stopped.
+    """
+
+
+@dataclass(frozen=True)
+class FinishErrorDetails:
+    """Error details for the payload of a FinishAction."""
 
     error: Exception
     error_id: str
@@ -32,10 +58,25 @@ class StopErrorDetails:
 
 
 @dataclass(frozen=True)
-class StopAction:
-    """Stop processing commands in the engine, marking the engine status as done."""
+class FinishAction:
+    """Gracefully stop processing commands in the engine.
 
-    error_details: Optional[StopErrorDetails] = None
+    After a FinishAction, the engine status will be marked as succeeded or failed.
+    """
+
+    error_details: Optional[FinishErrorDetails] = None
+
+
+@dataclass(frozen=True)
+class HardwareStoppedAction:
+    """An action dispatched after hardware has successfully been stopped."""
+
+
+@dataclass(frozen=True)
+class HardwareEventAction:
+    """Handle events coming in from hardware control."""
+
+    event: HardwareEvent
 
 
 @dataclass(frozen=True)
@@ -43,6 +84,7 @@ class QueueCommandAction:
     """Add a command request to the queue."""
 
     command_id: str
+    command_key: str
     created_at: datetime
     request: CommandCreate
 
@@ -56,7 +98,11 @@ class UpdateCommandAction:
 
 @dataclass(frozen=True)
 class FailCommandAction:
-    """Mark a given command as failed."""
+    """Mark a given command as failed.
+
+    The given command and all currently queued commands will be marked
+    as failed due to the given error.
+    """
 
     # TODO(mc, 2021-11-12): we'll likely need to add the command params
     # to this payload for state reaction purposes
@@ -68,19 +114,30 @@ class FailCommandAction:
 
 @dataclass(frozen=True)
 class AddLabwareOffsetAction:
-    """Add a new labware offset, to apply to subsequent `LoadLabwareCommand`s."""
+    """Add a labware offset, to apply to subsequent `LoadLabwareCommand`s."""
 
     labware_offset_id: str
     created_at: datetime
     request: LabwareOffsetCreate
 
 
+@dataclass(frozen=True)
+class AddLabwareDefinitionAction:
+    """Add a labware definition, to apply to subsequent `LoadLabwareCommand`s."""
+
+    definition: LabwareDefinition
+
+
 Action = Union[
     PlayAction,
     PauseAction,
     StopAction,
+    FinishAction,
+    HardwareStoppedAction,
+    HardwareEventAction,
     QueueCommandAction,
     UpdateCommandAction,
     FailCommandAction,
     AddLabwareOffsetAction,
+    AddLabwareDefinitionAction,
 ]

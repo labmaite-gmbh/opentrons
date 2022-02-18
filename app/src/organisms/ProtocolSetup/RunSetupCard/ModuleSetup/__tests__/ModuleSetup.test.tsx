@@ -19,19 +19,24 @@ import {
 import {
   mockThermocycler as mockThermocyclerFixture,
   mockMagneticModule as mockMagneticModuleFixture,
+  mockTemperatureModule,
 } from '../../../../../redux/modules/__fixtures__/index'
 import { getAttachedModules } from '../../../../../redux/modules'
 import { useModuleRenderInfoById } from '../../../hooks'
-import { useMissingModuleIds } from '../../hooks'
+import { useModuleMatchResults } from '../../hooks'
 import { MultipleModulesModal } from '../MultipleModulesModal'
 import { ModuleSetup } from '..'
 import { ModuleInfo } from '../ModuleInfo'
+import { UnMatchedModuleWarning } from '../UnMatchedModuleWarning'
+import { HeaterShakerBanner } from '../HeaterShakerSetupWizard/HeaterShakerBanner'
 
 jest.mock('../../../../../redux/modules')
 jest.mock('../ModuleInfo')
 jest.mock('../../hooks')
 jest.mock('../../../hooks')
 jest.mock('../MultipleModulesModal')
+jest.mock('../UnMatchedModuleWarning')
+jest.mock('../HeaterShakerSetupWizard/HeaterShakerBanner')
 jest.mock('@opentrons/components', () => {
   const actualComponents = jest.requireActual('@opentrons/components')
   return {
@@ -49,8 +54,8 @@ jest.mock('@opentrons/shared-data', () => {
 const mockMultipleModulesModal = MultipleModulesModal as jest.MockedFunction<
   typeof MultipleModulesModal
 >
-const mockUseMissingModuleIds = useMissingModuleIds as jest.MockedFunction<
-  typeof useMissingModuleIds
+const mockUseModuleMatchResults = useModuleMatchResults as jest.MockedFunction<
+  typeof useModuleMatchResults
 >
 const mockGetAttachedModules = getAttachedModules as jest.MockedFunction<
   typeof getAttachedModules
@@ -64,6 +69,12 @@ const mockRobotWorkSpace = RobotWorkSpace as jest.MockedFunction<
 >
 const mockUseModuleRenderInfoById = useModuleRenderInfoById as jest.MockedFunction<
   typeof useModuleRenderInfoById
+>
+const mockUnMatchedModuleWarning = UnMatchedModuleWarning as jest.MockedFunction<
+  typeof UnMatchedModuleWarning
+>
+const mockHeaterShakerBanner = HeaterShakerBanner as jest.MockedFunction<
+  typeof HeaterShakerBanner
 >
 
 const deckSlotsById = standardDeckDef.locations.orderedSlots.reduce(
@@ -134,6 +145,14 @@ describe('ModuleSetup', () => {
       .calledWith(expect.anything())
       .mockReturnValue(STUBBED_ORIENTATION_VALUE)
 
+    when(mockUnMatchedModuleWarning)
+      .calledWith(
+        componentPropsMatcher({
+          isAnyModuleUnnecessary: false,
+        })
+      )
+      .mockReturnValue(<div></div>)
+
     when(mockRobotWorkSpace)
       .mockReturnValue(<div></div>) // this (default) empty div will be returned when RobotWorkSpace isn't called with expected props
       .calledWith(
@@ -154,6 +173,10 @@ describe('ModuleSetup', () => {
     when(mockGetAttachedModules)
       .calledWith(undefined as any, MOCK_ROBOT_NAME)
       .mockReturnValue([])
+
+    when(mockHeaterShakerBanner).mockReturnValue(
+      <div>mock Heater Shaker Banner</div>
+    )
   })
 
   afterEach(() => {
@@ -164,7 +187,10 @@ describe('ModuleSetup', () => {
   it('should render a deck WITHOUT modules if none passed (component will never be rendered in this circumstance)', () => {
     when(mockUseModuleRenderInfoById).calledWith().mockReturnValue({})
 
-    mockUseMissingModuleIds.mockReturnValue([])
+    mockUseModuleMatchResults.mockReturnValue({
+      missingModuleIds: [],
+      remainingAttachedModules: [],
+    })
 
     render(props)
     expect(mockModuleInfo).not.toHaveBeenCalled()
@@ -271,7 +297,18 @@ describe('ModuleSetup', () => {
       )
       .mockReturnValue(<div>mock module info {mockTCModule.model} </div>)
 
-    mockUseMissingModuleIds.mockReturnValue(['foo'])
+    when(mockUnMatchedModuleWarning)
+      .calledWith(
+        componentPropsMatcher({
+          isAnyModuleUnnecessary: true,
+        })
+      )
+      .mockReturnValue(<div>mock modules mismatch</div>)
+
+    mockUseModuleMatchResults.mockReturnValue({
+      missingModuleIds: ['foo'],
+      remainingAttachedModules: [mockTemperatureModule],
+    })
 
     const { getByText, getByRole } = render(props)
     getByText('mock module info magneticModuleV2')
@@ -280,7 +317,10 @@ describe('ModuleSetup', () => {
   })
 
   it('should render a deck WITH modules with CTA enabled if all protocol requested modules have a matching attached module', () => {
-    mockUseMissingModuleIds.mockReturnValue([])
+    mockUseModuleMatchResults.mockReturnValue({
+      missingModuleIds: [],
+      remainingAttachedModules: [],
+    })
 
     when(mockUseModuleRenderInfoById)
       .calledWith()
@@ -345,7 +385,10 @@ describe('ModuleSetup', () => {
     expect(button).not.toBeDisabled()
   })
   it('renders Moam with the correct module in the correct slot', () => {
-    mockUseMissingModuleIds.mockReturnValue([])
+    mockUseModuleMatchResults.mockReturnValue({
+      missingModuleIds: [],
+      remainingAttachedModules: [],
+    })
 
     const dupModId = `${mockMagneticModule.moduleId}duplicate`
     const dupModPort = 10
@@ -416,4 +459,5 @@ describe('ModuleSetup', () => {
     const button = getByRole('button', { name: 'Proceed to Labware Setup' })
     expect(button).not.toBeDisabled()
   })
+  it.todo('renders heater shaker banner correctly')
 })

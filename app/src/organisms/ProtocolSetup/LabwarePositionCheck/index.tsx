@@ -9,6 +9,7 @@ import {
   useConditionalConfirm,
 } from '@opentrons/components'
 import { Portal } from '../../../App/portal'
+import { useTrackEvent } from '../../../redux/analytics'
 import { useRestartRun } from '../../ProtocolUpload/hooks/useRestartRun'
 import { useLabwarePositionCheck } from './hooks'
 import { IntroScreen } from './IntroScreen'
@@ -28,6 +29,7 @@ export const LabwarePositionCheck = (
 ): JSX.Element | null => {
   const { t } = useTranslation(['labware_position_check', 'shared'])
   const restartRun = useRestartRun()
+  const trackEvent = useTrackEvent()
   const [
     savePositionCommandData,
     savePositionCommandDataDispatch,
@@ -73,7 +75,12 @@ export const LabwarePositionCheck = (
     // show the modal for 5 seconds, then unmount and restart the run
     if (!isRestartingRun) {
       setTimeout(() => restartRun(), 5000)
-      !isRestartingRun && setIsRestartingRun(true)
+      setIsRestartingRun(true)
+      const { name, message } = labwarePositionCheckUtils.error
+      trackEvent({
+        name: 'labwarePositionCheckFailed',
+        properties: { error: { message, name } },
+      })
     }
     const { error } = labwarePositionCheckUtils
     return (
@@ -114,7 +121,21 @@ export const LabwarePositionCheck = (
 
   let modalContent: JSX.Element
   if (isLoading) {
-    modalContent = <RobotMotionLoadingModal title={titleText} />
+    modalContent = (
+      <ModalPage
+        contentsClassName={styles.modal_contents}
+        titleBar={{
+          title: t('labware_position_check_title'),
+          back: {
+            onClick: confirmExitLPC,
+            title: t('shared:exit'),
+            children: t('shared:exit'),
+          },
+        }}
+      >
+        <RobotMotionLoadingModal title={titleText} />
+      </ModalPage>
+    )
   } else if (showConfirmation) {
     modalContent = (
       <ExitPreventionModal
@@ -124,13 +145,23 @@ export const LabwarePositionCheck = (
     )
   } else if (showPickUpTipConfirmationModal) {
     modalContent = (
-      <ConfirmPickUpTipModal
-        title={t('confirm_pick_up_tip_modal_title')}
-        denyText={t('confirm_pick_up_tip_modal_try_again_text')}
-        confirmText={ctaText}
-        onConfirm={proceed}
-        onDeny={onUnsuccessfulPickUpTip}
-      />
+      <ModalPage
+        contentsClassName={styles.modal_contents}
+        titleBar={{
+          title: t('labware_position_check_title'),
+          back: {
+            onClick: confirmExitLPC,
+            title: t('shared:exit'),
+            children: t('shared:exit'),
+          },
+        }}
+      >
+        <ConfirmPickUpTipModal
+          confirmText={ctaText}
+          onConfirm={proceed}
+          onDeny={onUnsuccessfulPickUpTip}
+        />
+      </ModalPage>
     )
   } else if (isComplete) {
     modalContent = (

@@ -1,8 +1,15 @@
 """A collection of motions that define a single move."""
-from typing import List, Dict
+from typing import List, Dict, Iterable
 from dataclasses import dataclass
+import numpy as np  # type: ignore[import]
+from logging import getLogger
 
-from opentrons_hardware.drivers.can_bus import NodeId
+from opentrons_ot3_firmware.constants import NodeId
+
+LOG = getLogger(__name__)
+
+
+NodeIdMotionValues = Dict[NodeId, np.float64]
 
 
 @dataclass(frozen=True)
@@ -12,6 +19,7 @@ class MoveGroupSingleAxisStep:
     distance_mm: float
     velocity_mm_sec: float
     duration_sec: float
+    acceleration_mm_sec_sq: float = 0
 
 
 MoveGroupStep = Dict[
@@ -23,11 +31,24 @@ MoveGroup = List[MoveGroupStep]
 
 MoveGroups = List[MoveGroup]
 
+MAX_SPEEDS = {
+    NodeId.gantry_x: 50,
+    NodeId.gantry_y: 50,
+    NodeId.head_l: 50,
+    NodeId.head_r: 50,
+    NodeId.pipette_left: 2,
+    NodeId.pipette_right: 2,
+}
 
-def create(
-    origin: Dict[NodeId, float], target: Dict[NodeId, float], speed: float
-) -> MoveGroups:
-    """Create a move.
+
+def create_step(
+    distance: Dict[NodeId, np.float64],
+    velocity: Dict[NodeId, np.float64],
+    acceleration: Dict[NodeId, np.float64],
+    duration: np.float64,
+    present_nodes: Iterable[NodeId],
+) -> MoveGroupStep:
+    """Create a move from a block.
 
     Args:
         origin: Start position.
@@ -37,25 +58,13 @@ def create(
     Returns:
         A Move
     """
-    # Raise KeyError if axis is missing from origin
-    deltas = {ax: target[ax] - origin[ax] for ax in target.keys()}
-    # head (as opposed to head_l and head_r) is not an acceptable target for motion
-    deltas.pop(NodeId.head, None)
-
-    move_groups = []
-    for axis_node, axis_delta in deltas.items():
-        if not axis_delta:
-            continue
-        move_groups.append(
-            [
-                {
-                    axis_node: MoveGroupSingleAxisStep(
-                        distance_mm=axis_delta,
-                        velocity_mm_sec=speed if axis_delta > 0 else -speed,
-                        duration_sec=abs(axis_delta) / speed,
-                    )
-                }
-            ]
+    ordered_nodes = sorted(present_nodes, key=lambda node: node.value)
+    step: MoveGroupStep = {}
+    for axis_node in ordered_nodes:
+        step[axis_node] = MoveGroupSingleAxisStep(
+            distance_mm=distance.get(axis_node, 0),
+            acceleration_mm_sec_sq=acceleration.get(axis_node, 0),
+            velocity_mm_sec=velocity.get(axis_node, 0),
+            duration_sec=duration,
         )
-
-    return move_groups
+    return step

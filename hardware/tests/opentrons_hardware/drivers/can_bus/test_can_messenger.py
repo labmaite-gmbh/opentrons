@@ -6,29 +6,33 @@ from asyncio import Queue
 import pytest
 from mock import AsyncMock, Mock
 
-from opentrons_hardware.drivers.can_bus import (
+from opentrons_ot3_firmware.constants import (
     NodeId,
-    CanMessage,
+    MessageId,
+)
+
+from opentrons_ot3_firmware.message import CanMessage
+from opentrons_ot3_firmware.arbitration_id import (
     ArbitrationId,
     ArbitrationIdParts,
-    MessageId,
 )
 from opentrons_hardware.drivers.can_bus.can_messenger import (
     CanMessenger,
-    MessageListener,
+    MessageListenerCallback,
+    WaitableCallback,
 )
-from opentrons_hardware.drivers.can_bus.messages import MessageDefinition
-from opentrons_hardware.drivers.can_bus.messages.message_definitions import (
+from opentrons_ot3_firmware.messages import MessageDefinition
+from opentrons_ot3_firmware.messages.message_definitions import (
     HeartbeatRequest,
     MoveCompleted,
     GetMoveGroupRequest,
 )
-from opentrons_hardware.drivers.can_bus.messages.payloads import (
+from opentrons_ot3_firmware.messages.payloads import (
     EmptyPayload,
     MoveCompletedPayload,
     MoveGroupRequestPayload,
 )
-from opentrons_hardware.utils import UInt8Field, UInt32Field
+from opentrons_ot3_firmware.utils import UInt8Field, UInt32Field
 
 
 @pytest.fixture
@@ -64,7 +68,6 @@ def subject(mock_driver: AsyncMock) -> CanMessenger:
                     seq_id=UInt8Field(2),
                     current_position=UInt32Field(3),
                     ack_id=UInt8Field(4),
-                    node_id=UInt8Field(5),
                 )
             ),
         ],
@@ -82,7 +85,10 @@ async def test_send(
         message=CanMessage(
             arbitration_id=ArbitrationId(
                 parts=ArbitrationIdParts(
-                    message_id=message.message_id, node_id=node_id, function_code=0
+                    message_id=message.message_id,
+                    node_id=node_id,
+                    function_code=0,
+                    originating_node_id=NodeId.host,
                 )
             ),
             data=message.payload.serialize(),
@@ -102,6 +108,7 @@ async def test_listen_messages(
                     message_id=MessageId.get_move_group_request,
                     node_id=0,
                     function_code=0,
+                    originating_node_id=NodeId.gantry_x,
                 )
             ),
             data=b"\1",
@@ -109,7 +116,7 @@ async def test_listen_messages(
     )
 
     # Set up a listener
-    listener = Mock(spec=MessageListener)
+    listener = Mock(spec=MessageListenerCallback)
     subject.add_listener(listener)
 
     # Start the listener
@@ -124,6 +131,22 @@ async def test_listen_messages(
     await subject.stop()
 
     # Validate message.
-    listener.on_message.assert_called_once_with(
-        GetMoveGroupRequest(payload=MoveGroupRequestPayload(group_id=UInt8Field(1)))
+    listener.assert_called_once_with(
+        GetMoveGroupRequest(payload=MoveGroupRequestPayload(group_id=UInt8Field(1))),
+        ArbitrationId(
+            parts=ArbitrationIdParts(
+                node_id=NodeId.broadcast,
+                message_id=MessageId.get_move_group_request,
+                function_code=0,
+                originating_node_id=NodeId.gantry_x,
+            )
+        ),
     )
+
+
+async def test_waitable_callback_context() -> None:
+    """It should add itself and remove itself using context manager."""
+    mock_messenger = Mock(spec=CanMessenger)
+    with WaitableCallback(mock_messenger) as callback:
+        mock_messenger.add_listener.assert_called_once_with(callback)
+    mock_messenger.remove_listener.assert_called_once_with(callback)

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import re
 from collections import defaultdict
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from typing import Dict, List, Optional, Sequence
 
 from opentrons_shared_data.deck.dev_types import DeckDefinitionV2, SlotDefV2
@@ -16,8 +16,9 @@ from opentrons.calibration_storage.helpers import uri_from_details
 
 from .. import errors
 from ..resources import DeckFixedLabware
-from ..commands import Command, LoadLabwareResult, AddLabwareDefinitionResult
+from ..commands import Command, LoadLabwareResult
 from ..types import (
+    DeckSlotLocation,
     Dimensions,
     LabwareOffset,
     LabwareOffsetVector,
@@ -25,11 +26,19 @@ from ..types import (
     LabwareLocation,
     LoadedLabware,
 )
-from ..actions import Action, UpdateCommandAction, AddLabwareOffsetAction
+from ..actions import (
+    Action,
+    UpdateCommandAction,
+    AddLabwareOffsetAction,
+    AddLabwareDefinitionAction,
+)
 from .abstract_store import HasState, HandlesActions
 
 
-@dataclass(frozen=True)
+_TRASH_LOCATION = DeckSlotLocation(slotName=DeckSlotName.FIXED_TRASH)
+
+
+@dataclass
 class LabwareState:
     """State of all loaded labware resources."""
 
@@ -91,6 +100,7 @@ class LabwareStore(HasState[LabwareState], HandlesActions):
         """Modify state in reaction to an action."""
         if isinstance(action, UpdateCommandAction):
             self._handle_command(action.command)
+
         elif isinstance(action, AddLabwareOffsetAction):
             labware_offset = LabwareOffset(
                 id=action.labware_offset_id,
@@ -100,6 +110,14 @@ class LabwareStore(HasState[LabwareState], HandlesActions):
                 vector=action.request.vector,
             )
             self._add_labware_offset(labware_offset)
+
+        elif isinstance(action, AddLabwareDefinitionAction):
+            uri = uri_from_details(
+                namespace=action.definition.namespace,
+                load_name=action.definition.parameters.loadName,
+                version=action.definition.version,
+            )
+            self._state.definitions_by_uri[uri] = action.definition
 
     def _handle_command(self, command: Command) -> None:
         """Modify state in reaction to a command."""
@@ -115,8 +133,7 @@ class LabwareStore(HasState[LabwareState], HandlesActions):
                 version=command.result.definition.version,
             )
 
-            new_labware_by_id = self._state.labware_by_id.copy()
-            new_labware_by_id[labware_id] = LoadedLabware(
+            self._state.labware_by_id[labware_id] = LoadedLabware(
                 id=labware_id,
                 location=command.params.location,
                 loadName=command.result.definition.parameters.loadName,
@@ -124,26 +141,7 @@ class LabwareStore(HasState[LabwareState], HandlesActions):
                 offsetId=command.result.offsetId,
             )
 
-            new_definitions_by_uri = self._state.definitions_by_uri.copy()
-            new_definitions_by_uri[definition_uri] = command.result.definition
-
-            self._state = replace(
-                self._state,
-                labware_by_id=new_labware_by_id,
-                definitions_by_uri=new_definitions_by_uri,
-            )
-
-        elif isinstance(command.result, AddLabwareDefinitionResult):
-            definition_uri = uri_from_details(
-                namespace=command.result.namespace,
-                load_name=command.result.loadName,
-                version=command.result.version,
-            )
-            new_definitions_by_uri = self._state.definitions_by_uri.copy()
-            new_definitions_by_uri[definition_uri] = command.params.definition
-            self._state = replace(
-                self._state, definitions_by_uri=new_definitions_by_uri
-            )
+            self._state.definitions_by_uri[definition_uri] = command.result.definition
 
     def _add_labware_offset(self, labware_offset: LabwareOffset) -> None:
         """Add a new labware offset to state.
@@ -154,9 +152,7 @@ class LabwareStore(HasState[LabwareState], HandlesActions):
         """
         assert labware_offset.id not in self._state.labware_offsets_by_id
 
-        new_labware_offsets = self._state.labware_offsets_by_id.copy()
-        new_labware_offsets[labware_offset.id] = labware_offset
-        self._state = replace(self._state, labware_offsets_by_id=new_labware_offsets)
+        self._state.labware_offsets_by_id[labware_offset.id] = labware_offset
 
 
 class LabwareView(HasState[LabwareState]):
@@ -250,10 +246,17 @@ class LabwareView(HasState[LabwareState]):
     def get_well_definition(
         self,
         labware_id: str,
-        well_name: str,
+        well_name: Optional[str] = None,
     ) -> WellDefinition:
-        """Get a well's definition by labware and well identifier."""
+        """Get a well's definition by labware and well name.
+
+        If `well_name` is omitted, the first well in the labware
+        will be used.
+        """
         definition = self.get_definition(labware_id)
+
+        if well_name is None:
+            well_name = definition.ordering[0][0]
 
         try:
             return definition.wells[well_name]
@@ -360,8 +363,12 @@ class LabwareView(HasState[LabwareState]):
 
         Returns the *most recently* added matching offset,
         so later offsets can override earlier ones.
+        Or, ``None`` if no offsets match at all.
 
-        Returns ``None`` if no offsets match at all.
+        An offset "matches"
+        if its ``definition_uri`` and ``location`` *exactly* match what's provided.
+        This implies that if the location involves a module,
+        it will *not* match a module that's compatible but not identical.
         """
         for candidate in reversed(list(self._state.labware_offsets_by_id.values())):
             if (

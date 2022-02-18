@@ -2,9 +2,9 @@
 
 from collections import defaultdict
 from datetime import datetime
-from typing import Dict, List, Union, Optional
+from typing import Dict, List, Optional
 
-from opentrons.types import MountType, DeckSlotName
+from opentrons.types import MountType, DeckSlotName, Location
 from opentrons.commands import types as legacy_command_types
 from opentrons.protocol_engine import (
     ProtocolEngineError,
@@ -14,8 +14,10 @@ from opentrons.protocol_engine import (
 )
 from opentrons.protocol_engine.resources import ModelUtils, ModuleDataProvider
 from opentrons.protocols.models.labware_definition import LabwareDefinition
+from opentrons.protocols.geometry.deck import FIXED_TRASH_ID
 
 from .legacy_wrappers import (
+    LegacyLoadInfo,
     LegacyInstrumentLoadInfo,
     LegacyLabwareLoadInfo,
     LegacyModuleLoadInfo,
@@ -39,12 +41,20 @@ class LegacyContextCommandError(ProtocolEngineError):
     """An error returned when a PAPIv2 ProtocolContext command fails."""
 
 
-LEGACY_TO_PE_MODULE: Dict[LegacyModuleModel, pe_types.ModuleModel] = {
+_LEGACY_TO_PE_MODULE: Dict[LegacyModuleModel, pe_types.ModuleModel] = {
     LegacyMagneticModuleModel.MAGNETIC_V1: pe_types.ModuleModel.MAGNETIC_MODULE_V1,
     LegacyMagneticModuleModel.MAGNETIC_V2: pe_types.ModuleModel.MAGNETIC_MODULE_V2,
     LegacyTemperatureModuleModel.TEMPERATURE_V1: pe_types.ModuleModel.TEMPERATURE_MODULE_V1,  # noqa: E501
     LegacyTemperatureModuleModel.TEMPERATURE_V2: pe_types.ModuleModel.TEMPERATURE_MODULE_V2,  # noqa: E501
     LegacyThermocyclerModuleModel.THERMOCYCLER_V1: pe_types.ModuleModel.THERMOCYCLER_MODULE_V1,  # noqa: E501
+}
+
+_HIGHER_ORDER_COMMAND_TYPES = {
+    legacy_command_types.MIX,
+    legacy_command_types.CONSOLIDATE,
+    legacy_command_types.DISTRIBUTE,
+    legacy_command_types.TRANSFER,
+    legacy_command_types.RETURN_TIP,
 }
 
 
@@ -58,20 +68,29 @@ class LegacyCommandMapper:
         self, module_data_provider: Optional[ModuleDataProvider] = None
     ) -> None:
         """Initialize the command mapper."""
-        self._running_commands: Dict[str, List[pe_commands.Command]] = defaultdict(list)
+        # commands keyed by broker message ID
+        self._commands_by_broker_id: Dict[str, pe_commands.Command] = {}
+
+        # running count of each legacy command type, to construct IDs
         self._command_count: Dict[str, int] = defaultdict(lambda: 0)
-        self._labware_id_by_slot: Dict[DeckSlotName, str] = {}
+
+        # equipment IDs by physical location
+        self._labware_id_by_slot: Dict[DeckSlotName, str] = {
+            DeckSlotName.FIXED_TRASH: FIXED_TRASH_ID
+        }
         self._pipette_id_by_mount: Dict[MountType, str] = {}
         self._module_id_by_slot: Dict[DeckSlotName, str] = {}
-        self._module_data_provider = module_data_provider or ModuleDataProvider()
+
+        # module definition state and provider depedency
         self._module_definition_by_model: Dict[
             pe_types.ModuleModel, pe_types.ModuleDefinition
         ] = {}
+        self._module_data_provider = module_data_provider or ModuleDataProvider()
 
     def map_command(
         self,
         command: legacy_command_types.CommandMessage,
-    ) -> Union[pe_actions.UpdateCommandAction, pe_actions.FailCommandAction]:
+    ) -> List[pe_actions.Action]:
         """Map a legacy Broker command to a ProtocolEngine command.
 
         A "before" message from the Broker
@@ -84,11 +103,18 @@ class LegacyCommandMapper:
         command's status in-place.
         """
         command_type = command["name"]
+
+        if command_type in _HIGHER_ORDER_COMMAND_TYPES:
+            return []
+
         command_error = command["error"]
         stage = command["$"]
-
-        command_id = f"{command_type}-0"
+        # TODO(mc, 2021-12-08): use message ID as command ID directly once
+        # https://github.com/Opentrons/opentrons/issues/8986 is resolved
+        broker_id = command["id"]
         now = ModelUtils.get_timestamp()
+
+        results: List[pe_actions.Action] = []
 
         if stage == "before":
             count = self._command_count[command_type]
@@ -96,29 +122,158 @@ class LegacyCommandMapper:
             engine_command = self._build_initial_command(command, command_id, now)
 
             self._command_count[command_type] = count + 1
-            self._running_commands[command_type].append(engine_command)
+            self._commands_by_broker_id[broker_id] = engine_command
 
-            return pe_actions.UpdateCommandAction(engine_command)
+            results.append(pe_actions.UpdateCommandAction(engine_command))
 
-        elif command_error is None:
-            running_command = self._running_commands[command_type].pop()
-            completed_command = running_command.copy(
-                update={
-                    "status": pe_commands.CommandStatus.SUCCEEDED,
-                    "completedAt": now,
-                }
+        elif stage == "after":
+            running_command = self._commands_by_broker_id[broker_id]
+            completed_command: pe_commands.Command
+            if command_error is None:
+                if isinstance(running_command, pe_commands.PickUpTip):
+                    completed_command = running_command.copy(
+                        update={
+                            "result": pe_commands.PickUpTipResult.construct(),
+                            "status": pe_commands.CommandStatus.SUCCEEDED,
+                            "completedAt": now,
+                        }
+                    )
+                elif isinstance(running_command, pe_commands.DropTip):
+                    completed_command = running_command.copy(
+                        update={
+                            "result": pe_commands.DropTipResult.construct(),
+                            "status": pe_commands.CommandStatus.SUCCEEDED,
+                            "completedAt": now,
+                        }
+                    )
+                else:
+                    completed_command = running_command.copy(
+                        update={
+                            "status": pe_commands.CommandStatus.SUCCEEDED,
+                            "completedAt": now,
+                        }
+                    )
+                results.append(pe_actions.UpdateCommandAction(completed_command))
+
+                if isinstance(completed_command, pe_commands.Pause):
+                    results.append(
+                        pe_actions.PauseAction(source=pe_actions.PauseSource.PROTOCOL)
+                    )
+
+            else:
+                results.append(
+                    pe_actions.FailCommandAction(
+                        command_id=running_command.id,
+                        error_id=ModelUtils.generate_id(),
+                        failed_at=now,
+                        error=LegacyContextCommandError(str(command_error)),
+                    )
+                )
+
+        return results
+
+    def map_equipment_load(self, load_info: LegacyLoadInfo) -> pe_commands.Command:
+        """Map a labware, instrument (pipette), or module load to a PE command."""
+        if isinstance(load_info, LegacyLabwareLoadInfo):
+            return self._map_labware_load(load_info)
+        elif isinstance(load_info, LegacyInstrumentLoadInfo):
+            return self._map_instrument_load(load_info)
+        elif isinstance(load_info, LegacyModuleLoadInfo):
+            return self._map_module_load(load_info)
+
+    def _build_initial_command(
+        self,
+        command: legacy_command_types.CommandMessage,
+        command_id: str,
+        now: datetime,
+    ) -> pe_commands.Command:
+        engine_command: pe_commands.Command
+        well: LegacyWell
+        if (
+            command["name"] == legacy_command_types.PICK_UP_TIP
+            and "instrument" in command["payload"]
+            and "location" in command["payload"]
+            and isinstance(command["payload"]["location"], LegacyWell)
+        ):
+            pipette: LegacyPipetteContext = command["payload"]["instrument"]
+            _well = command["payload"].get("location")
+            if isinstance(_well, LegacyWell):
+                well = _well
+            else:
+                raise Exception("Unknown pick_up_tip location.")
+            mount = MountType(pipette.mount)
+            slot = DeckSlotName.from_primitive(well.parent.parent)  # type: ignore[arg-type] # noqa: E501
+            well_name = well.well_name
+            labware_id = self._labware_id_by_slot[slot]
+            pipette_id = self._pipette_id_by_mount[mount]
+
+            engine_command = pe_commands.PickUpTip.construct(
+                id=command_id,
+                key=command_id,
+                status=pe_commands.CommandStatus.RUNNING,
+                createdAt=now,
+                startedAt=now,
+                params=pe_commands.PickUpTipParams.construct(
+                    pipetteId=pipette_id,
+                    labwareId=labware_id,
+                    wellName=well_name,
+                ),
             )
-            return pe_actions.UpdateCommandAction(completed_command)
-
+        elif (
+            command["name"] == legacy_command_types.DROP_TIP
+            and "instrument" in command["payload"]
+            and "location" in command["payload"]
+        ):
+            pipette: LegacyPipetteContext = command["payload"]["instrument"]  # type: ignore  # noqa: E501
+            location = command["payload"].get("location")
+            if isinstance(location, Location):
+                well = location.labware.as_well()
+            else:
+                raise Exception("Unknown drop_tip location.")
+            mount = MountType(pipette.mount)
+            slot = DeckSlotName.from_primitive(well.parent.parent)  # type: ignore[arg-type] # noqa: E501
+            well_name = well.well_name
+            labware_id = self._labware_id_by_slot[slot]
+            pipette_id = self._pipette_id_by_mount[mount]
+            engine_command = pe_commands.DropTip.construct(
+                id=command_id,
+                key=command_id,
+                status=pe_commands.CommandStatus.RUNNING,
+                createdAt=now,
+                startedAt=now,
+                params=pe_commands.DropTipParams.construct(
+                    pipetteId=pipette_id,
+                    labwareId=labware_id,
+                    wellName=well_name,
+                ),
+            )
+        elif command["name"] == legacy_command_types.PAUSE:
+            engine_command = pe_commands.Pause.construct(
+                id=command_id,
+                key=command_id,
+                status=pe_commands.CommandStatus.RUNNING,
+                createdAt=now,
+                startedAt=now,
+                params=pe_commands.PauseParams.construct(
+                    message=command["payload"]["userMessage"],
+                ),
+            )
         else:
-            return pe_actions.FailCommandAction(
-                command_id=command_id,
-                error_id=ModelUtils.generate_id(),
-                failed_at=now,
-                error=LegacyContextCommandError(str(command_error)),
+            engine_command = pe_commands.Custom.construct(
+                id=command_id,
+                key=command_id,
+                status=pe_commands.CommandStatus.RUNNING,
+                createdAt=now,
+                startedAt=now,
+                params=LegacyCommandParams.construct(
+                    legacyCommandType=command["name"],
+                    legacyCommandText=command["payload"]["text"],
+                ),
             )
 
-    def map_labware_load(
+        return engine_command
+
+    def _map_labware_load(
         self, labware_load_info: LegacyLabwareLoadInfo
     ) -> pe_commands.Command:
         """Map a legacy labware load to a ProtocolEngine command."""
@@ -127,26 +282,29 @@ class LegacyCommandMapper:
         slot = labware_load_info.deck_slot
         location: pe_types.LabwareLocation
         if labware_load_info.on_module:
-            location = pe_types.ModuleLocation(moduleId=self._module_id_by_slot[slot])
+            location = pe_types.ModuleLocation.construct(
+                moduleId=self._module_id_by_slot[slot]
+            )
         else:
-            location = pe_types.DeckSlotLocation(slotName=slot)
+            location = pe_types.DeckSlotLocation.construct(slotName=slot)
 
         command_id = f"commands.LOAD_LABWARE-{count}"
         labware_id = f"labware-{count}"
 
-        load_labware_command = pe_commands.LoadLabware(
+        load_labware_command = pe_commands.LoadLabware.construct(
             id=command_id,
+            key=command_id,
             status=pe_commands.CommandStatus.SUCCEEDED,
             createdAt=now,
             startedAt=now,
             completedAt=now,
-            params=pe_commands.LoadLabwareParams(
+            params=pe_commands.LoadLabwareParams.construct(
                 location=location,
                 loadName=labware_load_info.labware_load_name,
                 namespace=labware_load_info.labware_namespace,
                 version=labware_load_info.labware_version,
             ),
-            result=pe_commands.LoadLabwareResult(
+            result=pe_commands.LoadLabwareResult.construct(
                 labwareId=labware_id,
                 definition=LabwareDefinition.parse_obj(
                     labware_load_info.labware_definition
@@ -162,7 +320,7 @@ class LegacyCommandMapper:
             self._labware_id_by_slot[location.slotName] = labware_id
         return load_labware_command
 
-    def map_instrument_load(
+    def _map_instrument_load(
         self,
         instrument_load_info: LegacyInstrumentLoadInfo,
     ) -> pe_commands.Command:
@@ -173,113 +331,69 @@ class LegacyCommandMapper:
         pipette_id = f"pipette-{count}"
         mount = MountType(str(instrument_load_info.mount).lower())
 
-        load_pipette_command = pe_commands.LoadPipette(
+        load_pipette_command = pe_commands.LoadPipette.construct(
             id=command_id,
+            key=command_id,
             status=pe_commands.CommandStatus.SUCCEEDED,
             createdAt=now,
             startedAt=now,
             completedAt=now,
-            params=pe_commands.LoadPipetteParams(
+            params=pe_commands.LoadPipetteParams.construct(
                 pipetteName=pe_types.PipetteName(
                     instrument_load_info.instrument_load_name
                 ),
                 mount=mount,
             ),
-            result=pe_commands.LoadPipetteResult(pipetteId=pipette_id),
+            result=pe_commands.LoadPipetteResult.construct(pipetteId=pipette_id),
         )
 
         self._command_count["LOAD_PIPETTE"] = count + 1
         self._pipette_id_by_mount[mount] = pipette_id
         return load_pipette_command
 
-    def map_module_load(
+    def _map_module_load(
         self, module_load_info: LegacyModuleLoadInfo
     ) -> pe_commands.Command:
         """Map a legacy module load to a Protocol Engine command."""
         now = ModelUtils.get_timestamp()
 
         count = self._command_count["LOAD_MODULE"]
+        command_id = f"commands.LOAD_MODULE-{count}"
         module_id = f"module-{count}"
-        module_model = LEGACY_TO_PE_MODULE[module_load_info.module_model]
+        requested_model = _LEGACY_TO_PE_MODULE[module_load_info.requested_model]
+        loaded_model = _LEGACY_TO_PE_MODULE[module_load_info.loaded_model]
 
         # This will fetch a V2 definition only. PAPI < v2.3 use V1 definitions.
         # When running a < v2.3 protocol, there will be a mismatch of definitions used
         # during analysis+LPC (V2) and protocol execution (V1).
         # But this shouldn't result in any problems since V2 and V1 definitions
         # have similar info, with V2 having additional info fields.
-        definition = self._module_definition_by_model.get(
-            module_model
-        ) or self._module_data_provider.get_module_definition(module_model)
+        loaded_definition = self._module_definition_by_model.get(
+            loaded_model
+        ) or self._module_data_provider.get_definition(loaded_model)
 
-        load_module_command = pe_commands.LoadModule(
-            id=f"commands.LOAD_MODULE-{count}",
+        load_module_command = pe_commands.LoadModule.construct(
+            id=command_id,
+            key=command_id,
             status=pe_commands.CommandStatus.SUCCEEDED,
             createdAt=now,
             startedAt=now,
             completedAt=now,
-            params=pe_commands.LoadModuleParams(
-                model=module_model,
+            params=pe_commands.LoadModuleParams.construct(
+                model=requested_model,
                 location=pe_types.DeckSlotLocation(
                     slotName=module_load_info.deck_slot,
                 ),
                 moduleId=module_id,
             ),
-            result=pe_commands.LoadModuleResult(
+            result=pe_commands.LoadModuleResult.construct(
                 moduleId=module_id,
-                moduleSerial=module_load_info.module_serial,
-                definition=definition,
+                serialNumber=module_load_info.module_serial,
+                definition=loaded_definition,
+                model=loaded_model,
             ),
         )
         self._command_count["LOAD_MODULE"] = count + 1
         self._module_id_by_slot[module_load_info.deck_slot] = module_id
-        self._module_definition_by_model[module_model] = definition
+        self._module_definition_by_model[loaded_model] = loaded_definition
         return load_module_command
-
-    def _build_initial_command(
-        self,
-        command: legacy_command_types.CommandMessage,
-        command_id: str,
-        now: datetime,
-    ) -> pe_commands.Command:
-        engine_command: pe_commands.Command
-
-        if (
-            command["name"] == legacy_command_types.PICK_UP_TIP
-            and "instrument" in command["payload"]
-            and "location" in command["payload"]
-            and isinstance(command["payload"]["location"], LegacyWell)  # type: ignore  # noqa: E501
-        ):
-            pipette: LegacyPipetteContext = command["payload"]["instrument"]  # type: ignore  # noqa: E501
-            well: LegacyWell = command["payload"]["location"]  # type: ignore  # noqa: E501
-            mount = MountType(pipette.mount)
-            slot = DeckSlotName.from_primitive(well.parent.parent)  # type: ignore[arg-type] # noqa: E501
-            well_name = well.well_name
-
-            labware_id = self._labware_id_by_slot[slot]
-            pipette_id = self._pipette_id_by_mount[mount]
-
-            engine_command = pe_commands.PickUpTip(
-                id=command_id,
-                status=pe_commands.CommandStatus.RUNNING,
-                createdAt=now,
-                startedAt=now,
-                params=pe_commands.PickUpTipParams(
-                    pipetteId=pipette_id,
-                    labwareId=labware_id,
-                    wellName=well_name,
-                ),
-            )
-
-        else:
-            engine_command = pe_commands.Custom(
-                id=command_id,
-                status=pe_commands.CommandStatus.RUNNING,
-                createdAt=now,
-                startedAt=now,
-                params=LegacyCommandParams(
-                    legacyCommandType=command["name"],
-                    legacyCommandText=command["payload"]["text"],
-                ),
-            )
-
-        return engine_command

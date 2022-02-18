@@ -9,7 +9,6 @@ import {
   LabwareRender,
   RobotWorkSpace,
   Module,
-  anyProps,
 } from '@opentrons/components'
 import {
   inferModuleOrientationFromXCoordinate,
@@ -21,19 +20,24 @@ import fixture_tiprack_300_ul from '@opentrons/shared-data/labware/fixtures/2/fi
 import standardDeckDef from '@opentrons/shared-data/deck/definitions/2/ot2_standard.json'
 import { fireEvent, screen } from '@testing-library/react'
 import { i18n } from '../../../../../i18n'
+import { getIsLabwareOffsetCodeSnippetsOn } from '../../../../../redux/config'
 import { useRunStatus } from '../../../../RunTimeControl/hooks'
-import { LabwareOffsetSuccessToast } from '../../../LabwareOffsetSuccessToast'
+import { useProtocolDetails } from '../../../../RunDetails/hooks'
 import { LabwarePositionCheck } from '../../../LabwarePositionCheck'
 import {
   useModuleRenderInfoById,
   useLabwareRenderInfoById,
+  useLPCSuccessToast,
 } from '../../../hooks'
+import * as hooks from '../../hooks'
 import { LabwareSetup } from '..'
 import { LabwareOffsetModal } from '../LabwareOffsetModal'
 import { LabwareInfoOverlay } from '../LabwareInfoOverlay'
 import { ExtraAttentionWarning } from '../ExtraAttentionWarning'
 import { getModuleTypesThatRequireExtraAttention } from '../utils/getModuleTypesThatRequireExtraAttention'
 
+jest.mock('../../hooks')
+jest.mock('../../../../../redux/config')
 jest.mock('../../../../../redux/modules')
 jest.mock('../../../../../redux/pipettes/selectors')
 jest.mock('../LabwareOffsetModal')
@@ -43,6 +47,7 @@ jest.mock('../ExtraAttentionWarning')
 jest.mock('../../../hooks')
 jest.mock('../utils/getModuleTypesThatRequireExtraAttention')
 jest.mock('../../../../RunTimeControl/hooks')
+jest.mock('../../../../RunDetails/hooks')
 jest.mock('../../../LabwareOffsetSuccessToast')
 jest.mock('@opentrons/components', () => {
   const actualComponents = jest.requireActual('@opentrons/components')
@@ -96,10 +101,21 @@ const mockLabwarePostionCheck = LabwarePositionCheck as jest.MockedFunction<
 const mockUseRunStatus = useRunStatus as jest.MockedFunction<
   typeof useRunStatus
 >
-const mockLabwareOffsetSuccessToast = LabwareOffsetSuccessToast as jest.MockedFunction<
-  typeof LabwareOffsetSuccessToast
+const mockUseProtocolDetails = useProtocolDetails as jest.MockedFunction<
+  typeof useProtocolDetails
 >
-
+const mockUseModuleMatchResults = hooks.useModuleMatchResults as jest.MockedFunction<
+  typeof hooks.useModuleMatchResults
+>
+const mockUseProtocolCalibrationStatus = hooks.useProtocolCalibrationStatus as jest.MockedFunction<
+  typeof hooks.useProtocolCalibrationStatus
+>
+const mockGetIsLabwareOffsetCodeSnippetsOn = getIsLabwareOffsetCodeSnippetsOn as jest.MockedFunction<
+  typeof getIsLabwareOffsetCodeSnippetsOn
+>
+const mockUseLPCSuccessToast = useLPCSuccessToast as jest.MockedFunction<
+  typeof useLPCSuccessToast
+>
 const deckSlotsById = standardDeckDef.locations.orderedSlots.reduce(
   (acc, deckSlot) => ({ ...acc, [deckSlot.id]: deckSlot }),
   {}
@@ -136,6 +152,29 @@ const mockTCModule = {
   type: 'thermocyclerModuleType' as ModuleType,
 }
 
+const PICKUP_TIP_LABWARE_ID = 'PICKUP_TIP_LABWARE_ID'
+const PRIMARY_PIPETTE_ID = 'PRIMARY_PIPETTE_ID'
+const PRIMARY_PIPETTE_NAME = 'PRIMARY_PIPETTE_NAME'
+const LABWARE_DEF_ID = 'LABWARE_DEF_ID'
+const LABWARE_DEF = {
+  ordering: [['A1', 'A2']],
+  parameters: { isTiprack: true },
+}
+const mockLabwarePositionCheckStepTipRack = {
+  labwareId:
+    '1d57fc10-67ad-11ea-9f8b-3b50068bd62d:opentrons/opentrons_96_filtertiprack_200ul/1',
+  section: '',
+  commands: [
+    {
+      commandType: 'pickUpTip',
+      params: {
+        pipetteId: PRIMARY_PIPETTE_ID,
+        labwareId: PICKUP_TIP_LABWARE_ID,
+      },
+    },
+  ],
+} as any
+
 describe('LabwareSetup', () => {
   beforeEach(() => {
     when(mockInferModuleOrientationFromXCoordinate)
@@ -155,9 +194,6 @@ describe('LabwareSetup', () => {
       .mockImplementation(({ onCloseClick }) => (
         <div onClick={onCloseClick}>mock LabwareOffsetModal </div>
       ))
-    when(mockLabwareOffsetSuccessToast)
-      .calledWith(anyProps())
-      .mockReturnValue(<div>mock Labware Success Toast</div>)
 
     when(mockLabwareRender)
       .mockReturnValue(<div></div>) // this (default) empty div will be returned when LabwareRender isn't called with expected labware definition
@@ -205,7 +241,42 @@ describe('LabwareSetup', () => {
     mockLabwarePostionCheck.mockReturnValue(
       <div>mock Labware Position Check</div>
     )
+    mockUseModuleMatchResults.mockReturnValue({
+      missingModuleIds: [],
+      remainingAttachedModules: [],
+    })
+
+    when(mockUseLPCSuccessToast)
+      .calledWith()
+      .mockReturnValue({ setIsShowingLPCSuccessToast: jest.fn() })
+
+    mockUseProtocolCalibrationStatus.mockReturnValue({
+      complete: true,
+    })
     mockUseRunStatus.mockReturnValue(RUN_STATUS_IDLE)
+    when(mockUseProtocolDetails)
+      .calledWith()
+      .mockReturnValue({
+        protocolData: {
+          labware: {
+            [mockLabwarePositionCheckStepTipRack.labwareId]: {
+              slot: '1',
+              displayName: 'someDisplayName',
+              definitionId: LABWARE_DEF_ID,
+            },
+          },
+          labwareDefinitions: {
+            [LABWARE_DEF_ID]: LABWARE_DEF,
+          },
+          pipettes: {
+            [PRIMARY_PIPETTE_ID]: {
+              name: PRIMARY_PIPETTE_NAME,
+              mount: 'left',
+            },
+          },
+        },
+      } as any)
+    mockGetIsLabwareOffsetCodeSnippetsOn.mockReturnValue(false)
   })
 
   afterEach(() => {
@@ -337,7 +408,7 @@ describe('LabwareSetup', () => {
       'Labware Position Check is an optional workflow that helps you verify the position of each labware on the deck. During this check, you can create Labware Offsets that adjust how the robot moves to each labware in the X, Y and Z directions.'
     )
   })
-  it('should render button and click it', () => {
+  it('should render LPC button and clicking should launch modal', () => {
     const { getByRole, getByText } = render()
     const button = getByRole('button', {
       name: 'run labware position check',
@@ -351,6 +422,7 @@ describe('LabwareSetup', () => {
     const button = getByRole('button', {
       name: 'run labware position check',
     })
+    expect(button).toBeDisabled()
     fireEvent.click(button)
     expect(queryByText('mock Labware Position Check')).toBeNull()
   })
@@ -372,22 +444,99 @@ describe('LabwareSetup', () => {
     const { getByText } = render()
     getByText('mock extra attention warning with magnetic module and TC')
   })
-  it('should render Labware Offset Success toast when LPC is closed', () => {
-    const { getByRole, getByText } = render()
-    expect(screen.queryByText('mock LabwareOffsetSuccessToast')).toBeNull()
+  it('should close Labware Offset Success toast when LPC is launched', () => {
+    const mockSetIsShowingLPCSuccessToast = jest.fn()
+    when(mockUseLPCSuccessToast).calledWith().mockReturnValue({
+      setIsShowingLPCSuccessToast: mockSetIsShowingLPCSuccessToast,
+    })
+    const { getByRole } = render()
     const button = getByRole('button', {
       name: 'run labware position check',
     })
     fireEvent.click(button)
-    const LPC = getByText('mock Labware Position Check')
-    fireEvent.click(LPC)
-    when(mockLabwarePostionCheck)
-      .calledWith(
-        componentPropsMatcher({
-          onLabwarePositionCheckComplete: expect.anything(),
-        })
-      )
-      .mockReturnValue(<div>mock LabwarePositionCheck</div>)
-    expect(screen.queryByText('mock LabwarePositionCheck')).toBeNull()
+    expect(mockSetIsShowingLPCSuccessToast).toHaveBeenCalledWith(false)
+  })
+  it('should render a disabled button when a protocol without a pipette AND without a labware is uploaded', () => {
+    mockUseProtocolDetails.mockReturnValue({
+      protocolData: { labware: {}, pipettes: {} },
+    } as any)
+    const { getByRole } = render()
+    const button = getByRole('button', {
+      name: 'run labware position check',
+    })
+    expect(button).toBeDisabled()
+  })
+  it('should render a disabled button when robot calibration is incomplete', () => {
+    mockUseProtocolCalibrationStatus.mockReturnValue({
+      complete: false,
+    })
+    const { getByRole } = render()
+    const button = getByRole('button', {
+      name: 'run labware position check',
+    })
+    expect(button).toBeDisabled()
+  })
+  it('should render a disabled button when modules are not connected', () => {
+    mockUseModuleMatchResults.mockReturnValue({
+      missingModuleIds: ['temperatureModuleV1'],
+      remainingAttachedModules: [],
+    })
+    const { getByRole } = render()
+    const button = getByRole('button', {
+      name: 'run labware position check',
+    })
+    expect(button).toBeDisabled()
+  })
+  it('should render a disabled button when modules are not connected and robot calibration is incomplete', () => {
+    mockUseProtocolCalibrationStatus.mockReturnValue({
+      complete: false,
+    })
+    mockUseModuleMatchResults.mockReturnValue({
+      missingModuleIds: ['temperatureModuleV1'],
+      remainingAttachedModules: [],
+    })
+    const { getByRole } = render()
+    const button = getByRole('button', {
+      name: 'run labware position check',
+    })
+    expect(button).toBeDisabled()
+  })
+  it('should render a disabled button when a protocol does not load a tip rack', () => {
+    mockUseProtocolDetails.mockReturnValue({
+      protocolData: {
+        labware: {
+          'labware-0': {
+            slot: '1',
+            displayName: 'someDisplayName',
+            definitionId: LABWARE_DEF_ID,
+          },
+        },
+        labwareDefinitions: {
+          [LABWARE_DEF_ID]: { parameters: { isTiprack: false } },
+        },
+        pipettes: {
+          [PRIMARY_PIPETTE_ID]: {
+            name: PRIMARY_PIPETTE_NAME,
+            mount: 'left',
+          },
+        },
+      },
+    } as any)
+    const { getByRole } = render()
+    const button = getByRole('button', {
+      name: 'run labware position check',
+    })
+    expect(button).toBeDisabled()
+  })
+  it('should render a get labware offset data link only when setting is true', () => {
+    mockGetIsLabwareOffsetCodeSnippetsOn.mockReturnValue(true)
+    const { getByRole } = render()
+    const getOffsetDataLink = getByRole('link', {
+      name: 'Get Labware Offset Data',
+    })
+    fireEvent.click(getOffsetDataLink)
+    getByRole('button', {
+      name: 'Jupyter Notebook',
+    })
   })
 })

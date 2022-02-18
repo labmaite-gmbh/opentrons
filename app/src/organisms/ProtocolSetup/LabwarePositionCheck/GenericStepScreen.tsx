@@ -1,21 +1,21 @@
 import * as React from 'react'
+import uniq from 'lodash/uniq'
+import isEqual from 'lodash/isEqual'
 import {
-  ALIGN_CENTER,
   DIRECTION_COLUMN,
   Flex,
   FONT_WEIGHT_SEMIBOLD,
   JUSTIFY_CENTER,
-  JUSTIFY_SPACE_BETWEEN,
-  PrimaryBtn,
+  NewPrimaryBtn,
   SPACING_3,
   SPACING_4,
   Text,
   TEXT_TRANSFORM_UPPERCASE,
-  C_BLUE,
+  ALIGN_FLEX_START,
 } from '@opentrons/components'
 import { LabwarePositionCheckStepDetail } from './LabwarePositionCheckStepDetail'
 import { SectionList } from './SectionList'
-import { useIntroInfo, useLabwareIdsBySection } from './hooks'
+import { useIntroInfo, useLabwareIdsBySection, useSteps } from './hooks'
 import { DeckMap } from './DeckMap'
 import type { Jog } from '../../../molecules/JogControls'
 import type { LabwarePositionCheckStep } from './types'
@@ -32,7 +32,7 @@ export const GenericStepScreen = (
 ): JSX.Element | null => {
   const introInfo = useIntroInfo()
   const labwareIdsBySection = useLabwareIdsBySection()
-  const [sectionIndex] = React.useState<number>(0)
+  const allSteps = useSteps()
   if (introInfo == null) return null
   const { sections, primaryPipetteMount, secondaryPipetteMount } = introInfo
   const labwareIdsToHighlight = labwareIdsBySection[props.selectedStep.section]
@@ -40,6 +40,16 @@ export const GenericStepScreen = (
     section => section === props.selectedStep.section
   )
   const completedSections = sections.slice(0, currentSectionIndex)
+  const selectedStepIndex = allSteps.findIndex(step =>
+    isEqual(step, props.selectedStep)
+  )
+  const completedSteps =
+    selectedStepIndex > 0 ? allSteps.slice(0, selectedStepIndex) : []
+
+  const completedLabwareIds = completedSteps.reduce<string[]>(
+    (acc, step) => uniq([...acc, step.labwareId]),
+    []
+  )
 
   return (
     <Flex margin={SPACING_3} flexDirection={DIRECTION_COLUMN}>
@@ -52,12 +62,8 @@ export const GenericStepScreen = (
       >
         {props.title}
       </Text>
-      <Flex
-        justifyContent={JUSTIFY_SPACE_BETWEEN}
-        alignItems={ALIGN_CENTER}
-        margin={SPACING_3}
-      >
-        <Flex flexDirection={DIRECTION_COLUMN}>
+      <Flex alignItems={ALIGN_FLEX_START} padding={SPACING_3}>
+        <Flex flexDirection={DIRECTION_COLUMN} paddingTop={SPACING_3}>
           <Flex marginLeft={SPACING_4}>
             <SectionList
               primaryPipetteMount={primaryPipetteMount}
@@ -67,12 +73,10 @@ export const GenericStepScreen = (
               completedSections={completedSections}
             />
           </Flex>
-          <Flex justifyContent={JUSTIFY_CENTER}>
+          <Flex justifyContent={JUSTIFY_CENTER} paddingTop={SPACING_3}>
             <DeckMap
               labwareIdsToHighlight={labwareIdsToHighlight}
-              completedLabwareIdSections={
-                labwareIdsBySection[sections[sectionIndex - 1]]
-              }
+              completedLabwareIds={completedLabwareIds}
             />
           </Flex>
         </Flex>
@@ -84,9 +88,7 @@ export const GenericStepScreen = (
         </Flex>
       </Flex>
       <Flex justifyContent={JUSTIFY_CENTER} marginBottom={SPACING_4}>
-        <PrimaryBtn backgroundColor={C_BLUE} onClick={props.proceed}>
-          {props.ctaText}
-        </PrimaryBtn>
+        <NewPrimaryBtn onClick={props.proceed}>{props.ctaText}</NewPrimaryBtn>
       </Flex>
     </Flex>
   )

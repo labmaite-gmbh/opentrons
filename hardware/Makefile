@@ -70,11 +70,11 @@ dist/opentrons_hardware-%-py2.py3-none-any.whl: setup.py $(ot_sources)
 wheel: $(wheel_file)
 
 $(sdist_file): setup.py $(ot_sources)
-	$(clean_cmd)
 	$(python) setup.py sdist
 	$(SHX) rm -rf build
 	$(SHX) ls dist
 
+.PHONY: sdist
 sdist: $(sdist_file)
 
 .PHONY: test
@@ -100,6 +100,10 @@ format:
 dev:
 	echo "Nothing here yet"
 
+.PHONY: opentrons_ot3_firmware_sdist
+opentrons_ot3_firmware_sdist: Pipfile.lock
+	mkdir -p dist
+	$(python) ../scripts/bundle_installed_package.py opentrons_ot3_firmware dist
 
 .PHONY: push-no-restart
 push-no-restart: wheel
@@ -109,11 +113,11 @@ push-no-restart: wheel
 push: push-no-restart
 	$(call restart-service,$(host),$(br_ssh_key),$(ssh_opts),"jupyter-notebook opentrons-robot-server")
 
-
 .PHONY: push-no-restart-ot3
-push-no-restart-ot3: $(sdist_file)
-	echo $(sdist_file)
+push-no-restart-ot3: sdist Pipfile.lock opentrons_ot3_firmware_sdist
+	echo $(sdist_file) $(wildcard dist/opentrons_ot3_firmware-*.tar.gz)
 	$(call push-python-sdist,$(host),,$(ssh_opts),$(sdist_file),/opt/opentrons-robot-server,"opentrons_hardware")
+	$(call push-python-sdist,$(host),,$(ssh_opts),$(wildcard dist/opentrons_ot3_firmware-*.tar.gz),/opt/opentrons-robot-server,"opentrons_ot3_firmware",,dist)
 
 .PHONY: push-ot3
 push-ot3: push-no-restart-ot3

@@ -1,9 +1,11 @@
 """Movement command handling."""
+from __future__ import annotations
+
 from typing import Dict, Optional, Sequence
 from dataclasses import dataclass
 
 from opentrons.types import Point
-from opentrons.hardware_control.api import API as HardwareAPI
+from opentrons.hardware_control import HardwareControlAPI
 from opentrons.hardware_control.types import (
     CriticalPoint,
     Axis as HardwareAxis,
@@ -14,6 +16,7 @@ from ..types import WellLocation, DeckPoint, MovementAxis, MotorAxis
 from ..state import StateStore, CurrentWell
 from ..errors import MustHomeError
 from ..resources import ModelUtils
+from .thermocycler_movement_flagger import ThermocyclerMovementFlagger
 
 
 MOTOR_AXIS_TO_HARDWARE_AXIS: Dict[MotorAxis, HardwareAxis] = {
@@ -38,19 +41,26 @@ class MovementHandler:
     """Implementation logic for gantry movement."""
 
     _state_store: StateStore
-    _hardware_api: HardwareAPI
+    _hardware_api: HardwareControlAPI
     _model_utils: ModelUtils
 
     def __init__(
         self,
         state_store: StateStore,
-        hardware_api: HardwareAPI,
+        hardware_api: HardwareControlAPI,
         model_utils: Optional[ModelUtils] = None,
+        thermocycler_movement_flagger: Optional[ThermocyclerMovementFlagger] = None,
     ) -> None:
         """Initialize a MovementHandler instance."""
         self._state_store = state_store
         self._hardware_api = hardware_api
         self._model_utils = model_utils or ModelUtils()
+        self._tc_movement_flagger = (
+            thermocycler_movement_flagger
+            or ThermocyclerMovementFlagger(
+                state_store=self._state_store, hardware_api=self._hardware_api
+            )
+        )
 
     async def move_to_well(
         self,
@@ -61,12 +71,15 @@ class MovementHandler:
         current_well: Optional[CurrentWell] = None,
     ) -> None:
         """Move to a specific well."""
+        await self._tc_movement_flagger.raise_if_labware_in_non_open_thermocycler(
+            labware_id=labware_id
+        )
+
         # get the pipette's mount and current critical point, if applicable
         pipette_location = self._state_store.motion.get_pipette_location(
             pipette_id=pipette_id,
             current_well=current_well,
         )
-
         hw_mount = pipette_location.mount.to_hw_mount()
         origin_cp = pipette_location.critical_point
 

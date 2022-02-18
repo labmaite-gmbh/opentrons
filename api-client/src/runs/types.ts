@@ -1,14 +1,18 @@
-import type { Command as FullCommand } from '@opentrons/shared-data'
-import type { LabwareLocation } from '@opentrons/shared-data/protocol/types/schemaV6/command/setup'
+import type { ModuleModel } from '@opentrons/shared-data'
+import type { ResourceLink } from '../types'
+import type { RunCommandSummary } from './commands/types'
+export * from './commands/types'
 
-export const RUN_STATUS_IDLE: 'idle' = 'idle'
-export const RUN_STATUS_RUNNING: 'running' = 'running'
-export const RUN_STATUS_PAUSE_REQUESTED: 'pause-requested' = 'pause-requested'
-export const RUN_STATUS_PAUSED: 'paused' = 'paused'
-export const RUN_STATUS_STOP_REQUESTED: 'stop-requested' = 'stop-requested'
-export const RUN_STATUS_STOPPED: 'stopped' = 'stopped'
-export const RUN_STATUS_FAILED: 'failed' = 'failed'
-export const RUN_STATUS_SUCCEEDED: 'succeeded' = 'succeeded'
+export const RUN_STATUS_IDLE = 'idle' as const
+export const RUN_STATUS_RUNNING = 'running' as const
+export const RUN_STATUS_PAUSE_REQUESTED = 'pause-requested' as const
+export const RUN_STATUS_PAUSED = 'paused'
+export const RUN_STATUS_STOP_REQUESTED = 'stop-requested' as const
+export const RUN_STATUS_STOPPED = 'stopped' as const
+export const RUN_STATUS_FAILED = 'failed' as const
+export const RUN_STATUS_FINISHING = 'finishing' as const
+export const RUN_STATUS_SUCCEEDED = 'succeeded' as const
+export const RUN_STATUS_BLOCKED_BY_OPEN_DOOR = 'blocked-by-open-door' as const
 
 export type RunStatus =
   | typeof RUN_STATUS_IDLE
@@ -18,19 +22,29 @@ export type RunStatus =
   | typeof RUN_STATUS_STOP_REQUESTED
   | typeof RUN_STATUS_STOPPED
   | typeof RUN_STATUS_FAILED
+  | typeof RUN_STATUS_FINISHING
   | typeof RUN_STATUS_SUCCEEDED
+  | typeof RUN_STATUS_BLOCKED_BY_OPEN_DOOR
 
 export interface RunData {
   id: string
   createdAt: string
+  current: boolean
   status: RunStatus
   actions: RunAction[]
-  commands: RunCommandSummary[]
   errors: Error[]
   pipettes: unknown[]
   labware: unknown[]
   protocolId?: string
   labwareOffsets?: LabwareOffset[]
+}
+
+export interface RunSummaryData {
+  id: string
+  createdAt: string
+  current: boolean
+  status: RunStatus
+  protocolId?: string
 }
 
 export interface VectorOffset {
@@ -42,25 +56,21 @@ export interface LabwareOffset {
   id: string
   createdAt: string
   definitionUri: string
-  location: LabwareLocation
+  location: LabwareOffsetLocation
   vector: VectorOffset
 }
 
-interface ResourceLink {
-  href: string
-  meta?: Partial<{ [key: string]: string | null | undefined }> | null
-}
-
-type ResourceLinks = Record<string, ResourceLink | string | null | undefined>
-
 export interface Run {
   data: RunData
-  links?: ResourceLinks
 }
 
-export interface Runs {
-  data: RunData[]
-  links?: ResourceLinks
+export interface RunSummariesLinks {
+  current?: ResourceLink
+}
+
+export interface RunSummaries {
+  data: RunSummaryData[]
+  links: RunSummariesLinks
 }
 
 export const RUN_ACTION_TYPE_PLAY: 'play' = 'play'
@@ -81,32 +91,19 @@ export interface RunAction {
 export interface CreateRunActionData {
   actionType: RunActionType
 }
-export interface RunCommandSummary {
-  id: string
-  commandType: FullCommand['commandType']
-  status: 'queued' | 'running' | 'succeeded' | 'failed'
-  result?: any
-}
 
+export interface LabwareOffsetLocation {
+  slotName: string
+  moduleModel?: ModuleModel
+}
 export interface LabwareOffsetCreateData {
   definitionUri: string
-  location: LabwareLocation
+  location: LabwareOffsetLocation
   vector: VectorOffset
 }
 
 export interface CommandData {
   data: RunCommandSummary
-  links?: ResourceLinks
-}
-
-export interface CommandsData {
-  data: RunCommandSummary[]
-  links?: ResourceLinks
-}
-
-export interface CommandDetail {
-  data: FullCommand
-  links: ResourceLinks | null
 }
 
 export interface Error {

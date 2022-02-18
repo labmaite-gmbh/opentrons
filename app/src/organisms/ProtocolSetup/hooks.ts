@@ -9,12 +9,12 @@ import { getLabwareRenderInfo } from './utils/getLabwareRenderInfo'
 import { getAttachedModules } from '../../redux/modules'
 import { getConnectedRobotName } from '../../redux/robot/selectors'
 import { AttachedModule } from '../../redux/modules/types'
-import { useCurrentProtocolRun } from '../ProtocolUpload/hooks'
+import { useCurrentProtocol } from '../ProtocolUpload/hooks'
 
 import type { ProtocolModuleInfo } from './utils/getProtocolModulesInfo'
 import type { LabwareRenderInfoById } from './utils/getLabwareRenderInfo'
-import type { Command } from '@opentrons/shared-data/protocol/types/schemaV6'
-import type { LoadPipetteCommand } from '@opentrons/shared-data/protocol/types/schemaV6/command/setup'
+import type { RunTimeCommand } from '@opentrons/shared-data/protocol/types/schemaV6'
+import type { LoadPipetteRunTimeCommand } from '@opentrons/shared-data/protocol/types/schemaV6/command/setup'
 
 interface ProtocolMetadata {
   author?: string
@@ -24,9 +24,9 @@ interface ProtocolMetadata {
 }
 
 export function useProtocolMetadata(): ProtocolMetadata {
-  const currentProtocolRun = useCurrentProtocolRun()
-  const protocolMetadata = currentProtocolRun.protocolRecord?.data?.metadata
-  const creationMethod = currentProtocolRun.protocolRecord?.data?.protocolType
+  const protocolRecord = useCurrentProtocol()
+  const protocolMetadata = protocolRecord?.data?.metadata
+  const creationMethod = protocolRecord?.data?.protocolType
   const author = protocolMetadata?.author
   const description = protocolMetadata?.description
   const lastUpdated = protocolMetadata?.lastModified
@@ -96,11 +96,11 @@ export function useLabwareRenderInfoById(): LabwareRenderInfoById {
 
 export function usePipetteMount(
   pipetteId: string
-): LoadPipetteCommand['params']['mount'] | null {
+): LoadPipetteRunTimeCommand['params']['mount'] | null {
   const { protocolData } = useProtocolDetails()
   return (
     protocolData?.commands.find(
-      (command: Command): command is LoadPipetteCommand =>
+      (command: RunTimeCommand): command is LoadPipetteRunTimeCommand =>
         command.commandType === 'loadPipette' &&
         command.params.pipetteId === pipetteId
     )?.params.mount ?? null
@@ -109,12 +109,12 @@ export function usePipetteMount(
 
 // this context is used to trigger an LPC success toast render from an LPC component lower in the tree
 export const LPCSuccessToastContext = createContext<{
-  setShowLPCSuccessToast: () => void
-}>({ setShowLPCSuccessToast: () => null })
+  setIsShowingLPCSuccessToast: (isShowing: boolean) => void
+}>({ setIsShowingLPCSuccessToast: () => null })
 
 export function useLPCSuccessToast(): {
-  setShowLPCSuccessToast: () => void
+  setIsShowingLPCSuccessToast: (isShowing: boolean) => void
 } {
-  const { setShowLPCSuccessToast } = useContext(LPCSuccessToastContext)
-  return { setShowLPCSuccessToast }
+  const { setIsShowingLPCSuccessToast } = useContext(LPCSuccessToastContext)
+  return { setIsShowingLPCSuccessToast }
 }

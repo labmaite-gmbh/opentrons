@@ -15,7 +15,9 @@
   "status_failed": "Completed",
   "status_pause-requested": "Pause requested",
   "status_paused": "Paused",
+  "status_blocked-by-open-door": "Paused - door open",
   "status_idle": "Not started",
+  "status_finishing": "Finishing",
   "status_running": "Running",
   "status_stop-requested": "Stop requested",
   "status_stopped": "Canceled",
@@ -47,6 +49,7 @@
   "load_labware_info_protocol_setup": "Load {{labware_loadname}} v{{labware_version}} in {{module_name}} in Slot {{slot_number}}",
   "load_labware_info_protocol_setup_plural": "Load {{labware_loadname}} v{{labware_version}} in {{module_name}}",
   "pickup_tip": "Picking up tip from {{well_name}} of {{labware}} in {{labware_location}}",
+  "drop_tip": "Dropping tip in {{well_name}} of {{labware}} in {{labware_location}}",
   "end_of_protocol": "End of protocol",
   "comment": "Comment",
   "anticipated": "Anticipated steps",
@@ -54,5 +57,12 @@
   "protocol_run_failed": "Protocol run failed",
   "protocol_run_canceled": "Protocol run canceled",
   "protocol_run_complete": "Protocol run complete",
-  "run_cta_disabled": "Complete required steps on Protocol tab before starting the run"
+  "run_cta_disabled": "Complete required steps on Protocol tab before starting the run",
+  "total_step_count": "{{count}} step total",
+  "total_step_count_plural": "{{count}} steps total",
+  "loading_protocol": "Loading Protocol",
+  "closing_protocol": "Closing Protocol",
+  "canceling_run": "Canceling Run",
+  "door_open_pause": "Current Step - Paused - Door Open",
+  "close_door_to_resume": "Close robot door to resume run"
 }

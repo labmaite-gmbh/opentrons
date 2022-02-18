@@ -8,15 +8,20 @@ log][]. For a list of currently known issues, please see the [Opentrons issue tr
 
 # OT-2 Software Changes in 5.0.0
 
-The 5.0.0 release of the OT-2 Software transitions to a new mechanism for ingesting and running protocols.
+Welcome to the v5.0.0 release of the Opentrons OT-2 software!
 
-## New Features
+This release is a complete refactor of how the OT-2 communicates with the Opentrons app, and features a number of changes to how protocols are loaded and stored on the robot.
 
-- TODO
+### New Features
 
-## Bug Fixes
+ - A modern, http-based interface has replaced the RPC endpoints for communicating with the Opentrons App
+ - More thorough information about a protocol is returned to the Opentrons App to enable the display of live protocol status
+ - The most recent protocol analysis and run are stored on the robot to enable easy, quick re-running via the Opentrons App
+ - A new way to use labware offsets in Jupyter notebook and SSH sessions
 
-- TODO
+## Known Issues
+
+Your last run protocol will not be saved through robot reboots
 
 ---
 

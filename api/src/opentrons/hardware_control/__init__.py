@@ -13,11 +13,9 @@ functions are available elsewhere.
 from .adapters import SynchronousAdapter
 from .api import API
 from .pause_manager import PauseManager
-from .controller import Controller
-from .simulator import Simulator
+from .backends import Controller, Simulator
 from .pipette import Pipette
 from .types import (
-    HardwareAPILike,
     CriticalPoint,
     NoTipAttachedError,
     TipAttachedError,
@@ -28,6 +26,10 @@ from .constants import DROP_TIP_RELEASE_DISTANCE
 from .thread_manager import ThreadManager
 from .execution_manager import ExecutionManager
 from .threaded_async_lock import ThreadedAsyncLock, ThreadedAsyncForbidden
+from .protocols import HardwareControlAPI
+
+ThreadManagedHardware = ThreadManager[HardwareControlAPI]
+SyncHardwareAPI = SynchronousAdapter[HardwareControlAPI]
 
 __all__ = [
     "API",
@@ -36,7 +38,7 @@ __all__ = [
     "Pipette",
     "PauseManager",
     "SynchronousAdapter",
-    "HardwareAPILike",
+    "HardwareControlAPI",
     "CriticalPoint",
     "NoTipAttachedError",
     "TipAttachedError",
@@ -47,4 +49,5 @@ __all__ = [
     "ExecutionCancelledError",
     "ThreadedAsyncLock",
     "ThreadedAsyncForbidden",
+    "ThreadManagedHardware",
 ]

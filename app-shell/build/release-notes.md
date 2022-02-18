@@ -8,15 +8,20 @@ log][]. For a list of currently known issues, please see the [Opentrons issue tr
 
 # Opentrons App Changes in 5.0.0
 
-The 5.0.0 release reshapes the way a user uploads and sets up protocols to run on the robot.
+Welcome to the v5.0.0 release of the Opentrons App!
+
+The 5.0.0 release reshapes the way you upload and set up protocols to run on your OT-2. Read below to find out about the new features in 5.0.0.
 
 ## New Features
 
-- TODO
+- A completely revamped protocol upload experience that will walk you through setting up your OT-2 for the run
+- A new way to check the positioning of your labware prior to a run, where you can apply offsets to each labware individually
+- More visibility into the progress of protocol execution on the robot
+- Quick and easy re-running of your last used protocol
 
-## Bug Fixes
+## Known Issues
 
-- TODO
+Your last run protocol will not be saved through robot reboots
 
 ---
 

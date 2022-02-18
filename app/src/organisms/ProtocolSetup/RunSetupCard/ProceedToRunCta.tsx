@@ -1,21 +1,23 @@
 import * as React from 'react'
 import { NavLink } from 'react-router-dom'
-import { useMissingModuleIds, useProtocolCalibrationStatus } from './hooks'
+import { useModuleMatchResults, useProtocolCalibrationStatus } from './hooks'
 import { useTranslation } from 'react-i18next'
 import {
   Flex,
-  PrimaryBtn,
+  NewPrimaryBtn,
   Tooltip,
   useHoverTooltip,
   JUSTIFY_CENTER,
-  C_BLUE,
 } from '@opentrons/components'
+import { useTrackEvent } from '../../../redux/analytics'
 
 export const ProceedToRunCta = (): JSX.Element | null => {
   const { t } = useTranslation('protocol_setup')
   const [targetProps, tooltipProps] = useHoverTooltip()
-  const missingModuleIds = useMissingModuleIds()
+  const moduleMatchResults = useModuleMatchResults()
+  const trackEvent = useTrackEvent()
   const isEverythingCalibrated = useProtocolCalibrationStatus().complete
+  const { missingModuleIds } = moduleMatchResults
   const calibrationIncomplete =
     missingModuleIds.length === 0 && !isEverythingCalibrated
   const moduleSetupIncomplete =
@@ -38,18 +40,18 @@ export const ProceedToRunCta = (): JSX.Element | null => {
   const linkProps = proceedToRunDisabledReason != null ? {} : { to: '/run' }
   return (
     <Flex justifyContent={JUSTIFY_CENTER}>
-      <PrimaryBtn
+      <NewPrimaryBtn
         role="button"
         title={t('proceed_to_run')}
         disabled={proceedToRunDisabledReason != null}
         as={LinkComponent}
-        backgroundColor={C_BLUE}
         id={'LabwareSetup_proceedToRunButton'}
+        onClick={() => trackEvent({ name: 'proceedToRun', properties: {} })}
         {...linkProps}
         {...targetProps}
       >
         {t('proceed_to_run')}
-      </PrimaryBtn>
+      </NewPrimaryBtn>
       {proceedToRunDisabledReason != null && (
         <Tooltip {...tooltipProps}>{proceedToRunDisabledReason}</Tooltip>
       )}
