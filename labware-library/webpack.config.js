@@ -41,7 +41,7 @@ module.exports = merge(baseConfig, {
 
   output: {
     path: OUT_PATH,
-    publicPath: '/',
+    publicPath: '/ll_test-ci/',
   },
 
   plugins: [
