@@ -18,6 +18,7 @@ import {
   OutlineButton,
 } from '@opentrons/components'
 import {
+  HEATERSHAKER_MODULE_V1,
   MAGNETIC_MODULE_TYPE,
   TEMPERATURE_MODULE_TYPE,
   THERMOCYCLER_MODULE_TYPE,
@@ -81,10 +82,15 @@ const initialFormState: FormState = {
     right: { pipetteName: '', tiprackDefURI: null },
   },
   modulesByType: {
+    [HEATERSHAKER_MODULE_TYPE]: {
+      onDeck: false,
+      model: HEATERSHAKER_MODULE_V1,
+      slot: '1',
+    },
     [MAGNETIC_MODULE_TYPE]: {
       onDeck: false,
       model: null,
-      slot: '1',
+      slot: '9',
     },
     [TEMPERATURE_MODULE_TYPE]: {
       onDeck: false,
@@ -95,11 +101,6 @@ const initialFormState: FormState = {
       onDeck: false,
       model: THERMOCYCLER_MODULE_V1, // Default to GEN1 for TC only
       slot: SPAN7_8_10_11_SLOT,
-    },
-    [HEATERSHAKER_MODULE_TYPE]: {
-      onDeck: false,
-      model: null,
-      slot: '6',
     },
   },
 }
@@ -141,6 +142,7 @@ const validationSchema = Yup.object().shape({
       Object.keys(value).some((val: string) => value[val].pipetteName)
     ),
   modulesByType: Yup.object().shape({
+    [HEATERSHAKER_MODULE_TYPE]: moduleValidationShape,
     [MAGNETIC_MODULE_TYPE]: moduleValidationShape,
     [TEMPERATURE_MODULE_TYPE]: moduleValidationShape,
     [THERMOCYCLER_MODULE_TYPE]: moduleValidationShape,

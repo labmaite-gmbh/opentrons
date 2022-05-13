@@ -37,6 +37,9 @@
     "open": "Open",
     "deactivate_after": "Deactivate after"
   },
+  "heaterShaker": {
+    "crashWarning": ""
+  },
   "block_label": "Block",
   "lid_label": "Lid ({{lidStatus}})",
   "lid_closed": "closed",
