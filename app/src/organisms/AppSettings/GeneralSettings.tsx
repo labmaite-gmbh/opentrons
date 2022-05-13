@@ -151,6 +151,7 @@ export function GeneralSettings(): JSX.Element {
               {t('shared:view_latest_release_notes')}
               <Link
                 external
+                css={TYPOGRAPHY.linkPSemiBold}
                 href={GITHUB_LINK}
                 id="AdvancedSettings_GitHubLink"
               >{` ${t('shared:github')}`}</Link>
@@ -160,7 +161,7 @@ export function GeneralSettings(): JSX.Element {
             </StyledText>
             <Link
               role="button"
-              css={TYPOGRAPHY.linkPSemibold}
+              css={TYPOGRAPHY.linkPSemiBold}
               onClick={() => setShowPreviousVersionModal(true)}
               id="GeneralSettings_previousVersionLink"
             >
@@ -170,7 +171,6 @@ export function GeneralSettings(): JSX.Element {
               {t('manage_versions')}
             </StyledText>
             <ExternalLink
-              css={TYPOGRAPHY.linkPSemibold}
               href={SOFTWARE_SYNC_URL}
               id="GeneralSettings_appAndRobotSync"
             >
