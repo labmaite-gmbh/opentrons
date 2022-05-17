@@ -17,7 +17,7 @@ on:
       - 'package.json'
       - '.github/workflows/components-test-build-deploy.yaml'
     branches:
-      - '*'
+      - '**'
     tags:
       - 'components*'
   workflow_dispatch:
@@ -47,7 +47,7 @@ jobs:
           path: |
             ${{ github.workspace }}/.yarn-cache
             ${{ github.workspace }}/.npm-cache
-          key: js-${{ secrets.GH_CACHE_VERSION }}-${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+          key: js-${{ secrets.GH_CACHE_VERSION }}-${{ runner.os }}-yarn-${{ hashFiles('yarn.lock') }}
           restore-keys: |
             js-${{ secrets.GH_CACHE_VERSION }}-${{ runner.os }}-yarn-
       - name: 'setup-js'
@@ -63,11 +63,12 @@ jobs:
         with:
           files: ./coverage/lcov.info
           flags: components
-  
+
   build-components:
     name: 'build components artifact'
     runs-on: 'ubuntu-18.04'
     if: github.event_name != 'pull_request'
+    needs: ['js-unit-test']
     steps:
       - uses: 'actions/checkout@v2'
       - uses: 'actions/setup-node@v1'
@@ -81,7 +82,7 @@ jobs:
           path: |
             ${{ github.workspace }}/.yarn-cache
             ${{ github.workspace }}/.npm-cache
-          key: js-${{ secrets.GH_CACHE_VERSION }}-${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+          key: js-${{ secrets.GH_CACHE_VERSION }}-${{ runner.os }}-yarn-${{ hashFiles('yarn.lock') }}
           restore-keys: |
             js-${{ secrets.GH_CACHE_VERSION }}-${{ runner.os }}-yarn-
       - name: 'setup-js'

@@ -1,14 +1,17 @@
+import asyncio
 import mock
+
 import pytest
 
 try:
     import aionotify
 except (OSError, ModuleNotFoundError):
     aionotify = None  # type: ignore
+
 import typeguard
+
 from opentrons import types
 from opentrons.hardware_control import API
-from opentrons.hardware_control.ot3api import OT3API
 from opentrons.hardware_control.types import Axis
 from opentrons.hardware_control.dev_types import PipetteDict
 
@@ -17,51 +20,69 @@ LEFT_PIPETTE_PREFIX = "p10_single"
 LEFT_PIPETTE_MODEL = "{}_v1".format(LEFT_PIPETTE_PREFIX)
 LEFT_PIPETTE_ID = "testy"
 
-dummy_instruments_attached = {
-    types.Mount.LEFT: {
-        "model": LEFT_PIPETTE_MODEL,
-        "id": LEFT_PIPETTE_ID,
-        "name": LEFT_PIPETTE_PREFIX,
-    },
-    types.Mount.RIGHT: {
-        "model": None,
-        "id": None,
-        "name": None,
-    },
-}
+
+def dummy_instruments_attached():
+    return {
+        types.Mount.LEFT: {
+            "model": LEFT_PIPETTE_MODEL,
+            "id": LEFT_PIPETTE_ID,
+            "name": LEFT_PIPETTE_PREFIX,
+        },
+        types.Mount.RIGHT: {
+            "model": None,
+            "id": None,
+            "name": None,
+        },
+    }
 
 
 @pytest.fixture
 def dummy_instruments():
-    return dummy_instruments_attached
+    return dummy_instruments_attached()
 
 
-dummy_instruments_attached_ot3 = {
-    types.Mount.LEFT: {
-        "model": "p1000_single_v3.0",
-        "id": "testy",
-        "name": "p1000_single_gen3",
-    },
-    types.Mount.RIGHT: {"model": None, "id": None, "name": None},
-}
+def dummy_instruments_attached_ot3():
+    return {
+        types.Mount.LEFT: {
+            "model": "p1000_single_v3.0",
+            "id": "testy",
+            "name": "p1000_single_gen3",
+        },
+        types.Mount.RIGHT: {"model": None, "id": None, "name": None},
+    }
 
 
 @pytest.fixture
 def dummy_instruments_ot3():
-    return dummy_instruments_attached_ot3
+    return dummy_instruments_attached_ot3()
+
+
+def wrap_build_ot3_sim():
+    from opentrons.hardware_control.ot3api import OT3API
+
+    return OT3API.build_hardware_simulator
+
+
+@pytest.fixture
+def ot3_api_obj(request):
+    if request.config.getoption("--ot2-only"):
+        pytest.skip("testing ot2 only")
+    from opentrons.hardware_control.ot3api import OT3API
+
+    return OT3API.build_hardware_simulator
 
 
 @pytest.fixture(
     params=[
-        (API.build_hardware_simulator, dummy_instruments_attached),
-        (OT3API.build_hardware_simulator, dummy_instruments_attached_ot3),
+        (lambda: API.build_hardware_simulator, dummy_instruments_attached),
+        (wrap_build_ot3_sim, dummy_instruments_attached_ot3),
     ],
     ids=["ot2", "ot3"],
 )
 def sim_and_instr(request):
     if (
         request.node.get_closest_marker("ot2_only")
-        and request.param[0] == OT3API.build_hardware_simulator
+        and request.param[0] == wrap_build_ot3_sim
     ):
         pytest.skip()
     if (
@@ -69,8 +90,12 @@ def sim_and_instr(request):
         and request.param[0] == API.build_hardware_simulator
     ):
         pytest.skip()
+    if request.param[0] == wrap_build_ot3_sim and request.config.getoption(
+        "--ot2-only"
+    ):
+        pytest.skip("testing ot2 only")
 
-    yield request.param
+    yield (request.param[0](), request.param[1]())
 
 
 @pytest.fixture
@@ -90,17 +115,28 @@ def dummy_backwards_compatibility():
     return dummy_instruments_attached
 
 
-async def test_cache_instruments(loop, sim_and_instr):
+def get_plunger_speed(api):
+    if isinstance(api, API):
+        return api.plunger_speed
+    else:
+        return api._instrument_handler.plunger_speed
+
+
+async def test_cache_instruments(sim_and_instr):
     sim_builder, dummy_instruments = sim_and_instr
-    hw_api = await sim_builder(attached_instruments=dummy_instruments, loop=loop)
+    hw_api = await sim_builder(
+        attached_instruments=dummy_instruments, loop=asyncio.get_running_loop()
+    )
     await hw_api.cache_instruments()
     attached = hw_api.attached_instruments
     typeguard.check_type("left mount dict", attached[types.Mount.LEFT], PipetteDict)
 
 
-async def test_mismatch_fails(loop, sim_and_instr):
+async def test_mismatch_fails(sim_and_instr):
     sim_builder, dummy_instruments = sim_and_instr
-    hw_api = await sim_builder(attached_instruments=dummy_instruments, loop=loop)
+    hw_api = await sim_builder(
+        attached_instruments=dummy_instruments, loop=asyncio.get_running_loop()
+    )
     requested_instr = {
         types.Mount.LEFT: "p20_single_gen2",
         types.Mount.RIGHT: "p300_single",
@@ -109,12 +145,11 @@ async def test_mismatch_fails(loop, sim_and_instr):
         await hw_api.cache_instruments(requested_instr)
 
 
-async def test_backwards_compatibility(
-    dummy_backwards_compatibility, loop, sim_and_instr
-):
+async def test_backwards_compatibility(dummy_backwards_compatibility, sim_and_instr):
     sim_builder, _ = sim_and_instr
     hw_api = await sim_builder(
-        attached_instruments=dummy_backwards_compatibility, loop=loop
+        attached_instruments=dummy_backwards_compatibility,
+        loop=asyncio.get_running_loop(),
     )
     requested_instr = {types.Mount.LEFT: "p10_single", types.Mount.RIGHT: "p300_single"}
     volumes = {
@@ -137,9 +172,8 @@ async def test_cache_instruments_hc(
     hardware_controller_lockfile,
     running_on_pi,
     cntrlr_mock_connect,
-    loop,
 ):
-    hw_api_cntrlr = await API.build_hardware_controller(loop=loop)
+    hw_api_cntrlr = await API.build_hardware_controller(loop=asyncio.get_running_loop())
 
     async def mock_driver_model(mount):
         attached_pipette = {"left": LEFT_PIPETTE_MODEL, "right": None}
@@ -175,7 +209,7 @@ async def test_cache_instruments_hc(
 
 
 @pytest.mark.ot2_only
-async def test_cache_instruments_sim(loop, sim_and_instr):
+async def test_cache_instruments_sim(sim_and_instr):
     sim_builder, dummy_instruments = sim_and_instr
 
     def fake_func1(value):
@@ -184,7 +218,7 @@ async def test_cache_instruments_sim(loop, sim_and_instr):
     def fake_func2(mount, value):
         return mount, value
 
-    sim = await sim_builder(loop=loop)
+    sim = await sim_builder(loop=asyncio.get_running_loop())
     # With nothing specified at init or expected, we should have nothing
     # afterwards and nothing should have been reconfigured
     sim._backend._smoothie_driver.update_steps_per_mm = mock.AsyncMock(fake_func1)
@@ -251,7 +285,7 @@ async def test_cache_instruments_sim(loop, sim_and_instr):
     # correspondence between expectations and preconfiguration
     sim = await sim_builder(
         attached_instruments=dummy_instruments,
-        loop=loop,
+        loop=asyncio.get_running_loop(),
         strict_attached_instruments=False,
     )
     await sim.cache_instruments({types.Mount.LEFT: "p300_multi"})
@@ -262,9 +296,11 @@ async def test_cache_instruments_sim(loop, sim_and_instr):
         await sim.cache_instruments({types.Mount.LEFT: "p10_sing"})
 
 
-async def test_prep_aspirate(loop, sim_and_instr):
+async def test_prep_aspirate(sim_and_instr):
     sim_builder, dummy_instruments = sim_and_instr
-    hw_api = await sim_builder(attached_instruments=dummy_instruments, loop=loop)
+    hw_api = await sim_builder(
+        attached_instruments=dummy_instruments, loop=asyncio.get_running_loop()
+    )
     await hw_api.home()
     await hw_api.cache_instruments()
 
@@ -281,9 +317,9 @@ async def test_prep_aspirate(loop, sim_and_instr):
     await hw_api.aspirate(mount, 1)
 
 
-async def test_aspirate_new(dummy_instruments, loop):
+async def test_aspirate_new(dummy_instruments):
     hw_api = await API.build_hardware_simulator(
-        attached_instruments=dummy_instruments, loop=loop
+        attached_instruments=dummy_instruments, loop=asyncio.get_running_loop()
     )
     await hw_api.home()
     await hw_api.cache_instruments()
@@ -300,9 +336,9 @@ async def test_aspirate_new(dummy_instruments, loop):
     assert pos[Axis.B] == new_plunger_pos
 
 
-async def test_aspirate_old(dummy_instruments, loop, old_aspiration):
+async def test_aspirate_old(dummy_instruments, old_aspiration):
     hw_api = await API.build_hardware_simulator(
-        attached_instruments=dummy_instruments, loop=loop
+        attached_instruments=dummy_instruments, loop=asyncio.get_running_loop()
     )
     await hw_api.home()
     await hw_api.cache_instruments()
@@ -319,9 +355,9 @@ async def test_aspirate_old(dummy_instruments, loop, old_aspiration):
     assert pos[Axis.B] == new_plunger_pos
 
 
-async def test_aspirate_ot3(dummy_instruments_ot3, loop):
-    hw_api = await OT3API.build_hardware_simulator(
-        attached_instruments=dummy_instruments_ot3, loop=loop
+async def test_aspirate_ot3(dummy_instruments_ot3, ot3_api_obj):
+    hw_api = await ot3_api_obj(
+        attached_instruments=dummy_instruments_ot3, loop=asyncio.get_running_loop()
     )
     await hw_api.home()
     await hw_api.cache_instruments()
@@ -338,9 +374,9 @@ async def test_aspirate_ot3(dummy_instruments_ot3, loop):
     assert pos[Axis.B] == new_plunger_pos
 
 
-async def test_dispense_ot2(dummy_instruments, loop):
+async def test_dispense_ot2(dummy_instruments):
     hw_api = await API.build_hardware_simulator(
-        attached_instruments=dummy_instruments, loop=loop
+        attached_instruments=dummy_instruments, loop=asyncio.get_running_loop()
     )
     await hw_api.home()
 
@@ -364,9 +400,9 @@ async def test_dispense_ot2(dummy_instruments, loop):
     assert (await hw_api.current_position(mount))[Axis.B] == plunger_pos_2
 
 
-async def test_dispense_ot3(dummy_instruments_ot3, loop):
-    hw_api = await OT3API.build_hardware_simulator(
-        attached_instruments=dummy_instruments_ot3, loop=loop
+async def test_dispense_ot3(dummy_instruments_ot3, ot3_api_obj):
+    hw_api = await ot3_api_obj(
+        attached_instruments=dummy_instruments_ot3, loop=asyncio.get_running_loop()
     )
     await hw_api.home()
 
@@ -390,9 +426,11 @@ async def test_dispense_ot3(dummy_instruments_ot3, loop):
     assert (await hw_api.current_position(mount))[Axis.B] == plunger_pos_2
 
 
-async def test_no_pipette(loop, sim_and_instr):
+async def test_no_pipette(sim_and_instr):
     sim_builder, dummy_instruments = sim_and_instr
-    hw_api = await sim_builder(attached_instruments=dummy_instruments, loop=loop)
+    hw_api = await sim_builder(
+        attached_instruments=dummy_instruments, loop=asyncio.get_running_loop()
+    )
     await hw_api.cache_instruments()
     aspirate_ul = 3.0
     aspirate_rate = 2
@@ -401,9 +439,11 @@ async def test_no_pipette(loop, sim_and_instr):
         assert not hw_api._current_volume[types.Mount.RIGHT]
 
 
-async def test_pick_up_tip(loop, is_robot, sim_and_instr):
+async def test_pick_up_tip(is_robot, sim_and_instr):
     sim_builder, dummy_instruments = sim_and_instr
-    hw_api = await sim_builder(attached_instruments=dummy_instruments, loop=loop)
+    hw_api = await sim_builder(
+        attached_instruments=dummy_instruments, loop=asyncio.get_running_loop()
+    )
     mount = types.Mount.LEFT
     await hw_api.home()
     await hw_api.cache_instruments()
@@ -415,13 +455,13 @@ async def test_pick_up_tip(loop, is_robot, sim_and_instr):
     # the tip length. That behavior is not tested here.
     tip_length = 25.0
     await hw_api.pick_up_tip(mount, tip_length)
-    assert hw_api._attached_instruments[mount].has_tip
-    assert hw_api._attached_instruments[mount].current_volume == 0
+    assert hw_api.hardware_instruments[mount].has_tip
+    assert hw_api.hardware_instruments[mount].current_volume == 0
 
 
-async def test_pick_up_tip_pos_ot2(loop, is_robot, dummy_instruments):
+async def test_pick_up_tip_pos_ot2(is_robot, dummy_instruments):
     hw_api = await API.build_hardware_simulator(
-        attached_instruments=dummy_instruments, loop=loop
+        attached_instruments=dummy_instruments, loop=asyncio.get_running_loop()
     )
     mount = types.Mount.LEFT
     await hw_api.home()
@@ -457,22 +497,24 @@ def assert_move_called(mock_move, speed, lock=None):
         )
 
 
-async def test_aspirate_flow_rate(loop, sim_and_instr):
+async def test_aspirate_flow_rate(sim_and_instr):
     sim_builder, dummy_instruments = sim_and_instr
-    hw_api = await sim_builder(attached_instruments=dummy_instruments, loop=loop)
+    hw_api = await sim_builder(
+        attached_instruments=dummy_instruments, loop=asyncio.get_running_loop()
+    )
     mount = types.Mount.LEFT
     await hw_api.home()
     await hw_api.cache_instruments()
 
     await hw_api.pick_up_tip(mount, 20.0)
 
-    pip = hw_api._attached_instruments[mount]
+    pip = hw_api.hardware_instruments[mount]
     with mock.patch.object(hw_api, "_move") as mock_move:
         await hw_api.prepare_for_aspirate(types.Mount.LEFT)
         await hw_api.aspirate(types.Mount.LEFT, 2)
         assert_move_called(
             mock_move,
-            hw_api.plunger_speed(pip, pip.config.aspirate_flow_rate, "aspirate"),
+            get_plunger_speed(hw_api)(pip, pip.config.aspirate_flow_rate, "aspirate"),
         )
 
     with mock.patch.object(hw_api, "_move") as mock_move:
@@ -480,19 +522,27 @@ async def test_aspirate_flow_rate(loop, sim_and_instr):
         await hw_api.aspirate(types.Mount.LEFT, 2, rate=0.5)
         assert_move_called(
             mock_move,
-            hw_api.plunger_speed(pip, pip.config.aspirate_flow_rate * 0.5, "aspirate"),
+            get_plunger_speed(hw_api)(
+                pip, pip.config.aspirate_flow_rate * 0.5, "aspirate"
+            ),
         )
 
     hw_api.set_flow_rate(mount, aspirate=1)
     with mock.patch.object(hw_api, "_move") as mock_move:
         await hw_api.prepare_for_aspirate(types.Mount.LEFT)
         await hw_api.aspirate(types.Mount.LEFT, 2)
-        assert_move_called(mock_move, hw_api.plunger_speed(pip, 1, "aspirate"))
+        assert_move_called(
+            mock_move,
+            get_plunger_speed(hw_api)(pip, 1, "aspirate"),
+        )
 
     with mock.patch.object(hw_api, "_move") as mock_move:
         await hw_api.prepare_for_aspirate(types.Mount.LEFT)
         await hw_api.aspirate(types.Mount.LEFT, 2, rate=0.5)
-        assert_move_called(mock_move, hw_api.plunger_speed(pip, 0.5, "aspirate"))
+        assert_move_called(
+            mock_move,
+            get_plunger_speed(hw_api)(pip, 0.5, "aspirate"),
+        )
 
     hw_api.set_pipette_speed(mount, aspirate=10)
     with mock.patch.object(hw_api, "_move") as mock_move:
@@ -506,9 +556,11 @@ async def test_aspirate_flow_rate(loop, sim_and_instr):
         assert_move_called(mock_move, 5)
 
 
-async def test_dispense_flow_rate(loop, sim_and_instr):
+async def test_dispense_flow_rate(sim_and_instr):
     sim_builder, dummy_instruments = sim_and_instr
-    hw_api = await sim_builder(attached_instruments=dummy_instruments, loop=loop)
+    hw_api = await sim_builder(
+        attached_instruments=dummy_instruments, loop=asyncio.get_running_loop()
+    )
     mount = types.Mount.LEFT
     await hw_api.home()
     await hw_api.cache_instruments()
@@ -518,20 +570,22 @@ async def test_dispense_flow_rate(loop, sim_and_instr):
     await hw_api.prepare_for_aspirate(types.Mount.LEFT)
     await hw_api.aspirate(mount, 10)
 
-    pip = hw_api._attached_instruments[mount]
+    pip = hw_api.hardware_instruments[mount]
 
     with mock.patch.object(hw_api, "_move") as mock_move:
         await hw_api.dispense(types.Mount.LEFT, 2)
         assert_move_called(
             mock_move,
-            hw_api.plunger_speed(pip, pip.config.dispense_flow_rate, "dispense"),
+            get_plunger_speed(hw_api)(pip, pip.config.dispense_flow_rate, "dispense"),
         )
 
     with mock.patch.object(hw_api, "_move") as mock_move:
         await hw_api.dispense(types.Mount.LEFT, 2, rate=0.5)
         assert_move_called(
             mock_move,
-            hw_api.plunger_speed(pip, pip.config.dispense_flow_rate * 0.5, "dispense"),
+            get_plunger_speed(hw_api)(
+                pip, pip.config.dispense_flow_rate * 0.5, "dispense"
+            ),
         )
 
     hw_api.set_flow_rate(mount, dispense=3)
@@ -539,12 +593,15 @@ async def test_dispense_flow_rate(loop, sim_and_instr):
         await hw_api.dispense(types.Mount.LEFT, 2)
         assert_move_called(
             mock_move,
-            hw_api.plunger_speed(pip, 3, "dispense"),
+            get_plunger_speed(hw_api)(pip, 3, "dispense"),
         )
 
     with mock.patch.object(hw_api, "_move") as mock_move:
         await hw_api.dispense(types.Mount.LEFT, 2, rate=0.5)
-        assert_move_called(mock_move, hw_api.plunger_speed(pip, 1.5, "dispense"))
+        assert_move_called(
+            mock_move,
+            get_plunger_speed(hw_api)(pip, 1.5, "dispense"),
+        )
 
     hw_api.set_pipette_speed(mount, dispense=10)
     with mock.patch.object(hw_api, "_move") as mock_move:
@@ -556,16 +613,18 @@ async def test_dispense_flow_rate(loop, sim_and_instr):
         assert_move_called(mock_move, 5)
 
 
-async def test_blowout_flow_rate(loop, sim_and_instr):
+async def test_blowout_flow_rate(sim_and_instr):
     sim_builder, dummy_instruments = sim_and_instr
-    hw_api = await sim_builder(attached_instruments=dummy_instruments, loop=loop)
+    hw_api = await sim_builder(
+        attached_instruments=dummy_instruments, loop=asyncio.get_running_loop()
+    )
     mount = types.Mount.LEFT
     await hw_api.home()
     await hw_api.cache_instruments()
 
     await hw_api.pick_up_tip(mount, 20.0)
 
-    pip = hw_api._attached_instruments[mount]
+    pip = hw_api.hardware_instruments[mount]
 
     with mock.patch.object(hw_api, "_move") as mock_move:
         await hw_api.prepare_for_aspirate(mount)
@@ -573,7 +632,7 @@ async def test_blowout_flow_rate(loop, sim_and_instr):
         await hw_api.blow_out(mount)
         assert_move_called(
             mock_move,
-            hw_api.plunger_speed(pip, pip.config.blow_out_flow_rate, "dispense"),
+            get_plunger_speed(hw_api)(pip, pip.config.blow_out_flow_rate, "dispense"),
         )
 
     hw_api.set_flow_rate(mount, blow_out=2)
@@ -581,7 +640,10 @@ async def test_blowout_flow_rate(loop, sim_and_instr):
         await hw_api.prepare_for_aspirate(mount)
         await hw_api.aspirate(mount, 10)
         await hw_api.blow_out(types.Mount.LEFT)
-        assert_move_called(mock_move, hw_api.plunger_speed(pip, 2, "dispense"))
+        assert_move_called(
+            mock_move,
+            get_plunger_speed(hw_api)(pip, 2, "dispense"),
+        )
 
     hw_api.set_pipette_speed(mount, blow_out=15)
     with mock.patch.object(hw_api, "_move") as mock_move:
@@ -591,25 +653,27 @@ async def test_blowout_flow_rate(loop, sim_and_instr):
         assert_move_called(mock_move, 15)
 
 
-async def test_reset_instruments(loop, monkeypatch, sim_and_instr):
+async def test_reset_instruments(monkeypatch, sim_and_instr):
     sim_builder, dummy_instruments = sim_and_instr
-    hw_api = await sim_builder(attached_instruments=dummy_instruments, loop=loop)
+    hw_api = await sim_builder(
+        attached_instruments=dummy_instruments, loop=asyncio.get_running_loop()
+    )
     hw_api.set_flow_rate(types.Mount.LEFT, 20)
     # gut check
     assert hw_api.attached_instruments[types.Mount.LEFT]["aspirate_flow_rate"] == 20
-    old_l = hw_api._attached_instruments[types.Mount.LEFT]
-    old_r = hw_api._attached_instruments[types.Mount.RIGHT]
+    old_l = hw_api.hardware_instruments[types.Mount.LEFT]
+    old_r = hw_api.hardware_instruments[types.Mount.RIGHT]
     hw_api.reset_instrument(types.Mount.LEFT)
     # left should have been reset, right should not
-    assert not (old_l is hw_api._attached_instruments[types.Mount.LEFT])
-    assert old_r is hw_api._attached_instruments[types.Mount.RIGHT]
+    assert not (old_l is hw_api.hardware_instruments[types.Mount.LEFT])
+    assert old_r is hw_api.hardware_instruments[types.Mount.RIGHT]
     # after the reset, the left should be more or less the same
-    assert old_l.pipette_id == hw_api._attached_instruments[types.Mount.LEFT].pipette_id
+    assert old_l.pipette_id == hw_api.hardware_instruments[types.Mount.LEFT].pipette_id
     # but non-default configs should be changed
     assert hw_api.attached_instruments[types.Mount.LEFT]["aspirate_flow_rate"] != 20
-    old_l = hw_api._attached_instruments[types.Mount.LEFT]
-    old_r = hw_api._attached_instruments[types.Mount.RIGHT]
+    old_l = hw_api.hardware_instruments[types.Mount.LEFT]
+    old_r = hw_api.hardware_instruments[types.Mount.RIGHT]
 
     hw_api.reset_instrument()
-    assert not (old_l is hw_api._attached_instruments[types.Mount.LEFT])
-    assert not (old_r is hw_api._attached_instruments[types.Mount.LEFT])
+    assert not (old_l is hw_api.hardware_instruments[types.Mount.LEFT])
+    assert not (old_r is hw_api.hardware_instruments[types.Mount.LEFT])

@@ -81,11 +81,18 @@ const copyLabware = (
     if (next.type !== CustomLabware.VALID_LABWARE_FILE) {
       return dispatch(CustomLabware.addCustomLabwareFailure(next))
     }
-
-    return Definitions.addLabwareFile(next.filename, dir).then(() =>
-      fetchAndValidateCustomLabware(dispatch, CustomLabware.ADD_LABWARE)
-    )
+    return Definitions.addLabwareFile(next.filename, dir)
+      .then(() =>
+        fetchAndValidateCustomLabware(dispatch, CustomLabware.ADD_LABWARE)
+      )
+      .then(() => dispatch(CustomLabware.addNewLabwareName(newFile.filename)))
   })
+}
+
+const deleteLabware = (dispatch: Dispatch, filePath: string): Promise<void> => {
+  return Definitions.removeLabwareFile(filePath).then(() =>
+    fetchAndValidateCustomLabware(dispatch, CustomLabware.DELETE_LABWARE)
+  )
 }
 
 export function registerLabware(
@@ -154,6 +161,22 @@ export function registerLabware(
           dispatch(CustomLabware.addCustomLabwareFailure(null, error.message))
         })
 
+        break
+      }
+
+      case CustomLabware.ADD_CUSTOM_LABWARE_FILE: {
+        const filePath = action.payload.filePath
+        copyLabware(dispatch, [filePath]).catch((error: Error) => {
+          dispatch(CustomLabware.addCustomLabwareFailure(null, error.message))
+        })
+        break
+      }
+
+      case CustomLabware.DELETE_CUSTOM_LABWARE_FILE: {
+        const filePath = action.payload.filePath
+        deleteLabware(dispatch, filePath).catch((error: Error) => {
+          console.error(error)
+        })
         break
       }
 

@@ -3,6 +3,7 @@ import type {
   TemperatureModuleModel,
   ThermocyclerModuleModel,
   MagneticModuleModel,
+  HeaterShakerModuleModel,
 } from '@opentrons/shared-data'
 import type { Slot } from '../robot/api-types'
 
@@ -10,6 +11,7 @@ import {
   TEMPERATURE_MODULE_TYPE,
   MAGNETIC_MODULE_TYPE,
   THERMOCYCLER_MODULE_TYPE,
+  HEATERSHAKER_MODULE_TYPE,
 } from '@opentrons/shared-data'
 
 import * as ApiTypes from './api-types'
@@ -23,30 +25,34 @@ export type CommonModuleInfo = Omit<
 >
 
 export interface TemperatureModule extends CommonModuleInfo {
-  type: typeof TEMPERATURE_MODULE_TYPE
-  model: TemperatureModuleModel
-  status: ApiTypes.TemperatureStatus
+  moduleType: typeof TEMPERATURE_MODULE_TYPE
+  moduleModel: TemperatureModuleModel
   data: ApiTypes.TemperatureData
 }
 
 export interface MagneticModule extends CommonModuleInfo {
-  type: typeof MAGNETIC_MODULE_TYPE
-  model: MagneticModuleModel
-  status: ApiTypes.MagneticStatus
+  moduleType: typeof MAGNETIC_MODULE_TYPE
+  moduleModel: MagneticModuleModel
   data: ApiTypes.MagneticData
 }
 
 export interface ThermocyclerModule extends CommonModuleInfo {
-  type: typeof THERMOCYCLER_MODULE_TYPE
-  model: ThermocyclerModuleModel
-  status: ApiTypes.ThermocyclerStatus
+  moduleType: typeof THERMOCYCLER_MODULE_TYPE
+  moduleModel: ThermocyclerModuleModel
   data: ApiTypes.ThermocyclerData
+}
+
+export interface HeaterShakerModule extends CommonModuleInfo {
+  moduleType: typeof HEATERSHAKER_MODULE_TYPE
+  moduleModel: HeaterShakerModuleModel
+  data: ApiTypes.HeaterShakerData
 }
 
 export type AttachedModule =
   | TemperatureModule
   | MagneticModule
   | ThermocyclerModule
+  | HeaterShakerModule
 // action object types
 
 export interface MatchedModule {

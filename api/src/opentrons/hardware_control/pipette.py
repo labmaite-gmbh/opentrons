@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import functools
+
 """ Classes and functions for pipette state tracking
 """
 from dataclasses import asdict, replace
@@ -13,7 +15,7 @@ from opentrons.calibration_storage.types import PipetteOffsetByPipetteMount
 from opentrons.config import pipette_config, robot_configs
 from opentrons.config.types import RobotConfig, OT3Config
 from opentrons.drivers.types import MoveSplit
-from .types import CriticalPoint, BoardRevision
+from .types import CriticalPoint, BoardRevision, OT3AxisKind
 
 
 if TYPE_CHECKING:
@@ -45,7 +47,7 @@ class Pipette:
         self,
         config: pipette_config.PipetteConfig,
         pipette_offset_cal: PipetteOffsetByPipetteMount,
-        pipette_id: str = None,
+        pipette_id: Optional[str] = None,
     ) -> None:
         self._config = config
         self._pipette_offset = pipette_offset_cal
@@ -78,7 +80,7 @@ class Pipette:
         # as_dict.
         self._config_as_dict = asdict(config)
 
-    def act_as(self, name: PipetteName):
+    def act_as(self, name: PipetteName) -> None:
         """Reconfigure to act as ``name``. ``name`` must be either the
         actual name of the pipette, or a name in its back-compatibility
         config.
@@ -99,7 +101,7 @@ class Pipette:
     def acting_as(self) -> PipetteName:
         return self._acting_as
 
-    def update_pipette_offset(self, offset_cal: PipetteOffsetByPipetteMount):
+    def update_pipette_offset(self, offset_cal: PipetteOffsetByPipetteMount) -> None:
         self._log.info("updating pipette offset to {}".format(offset_cal.offset))
         self._pipette_offset = offset_cal
 
@@ -111,7 +113,7 @@ class Pipette:
     def nozzle_offset(self) -> Tuple[float, float, float]:
         return self._nozzle_offset
 
-    def update_config_item(self, elem_name: str, elem_val: Any):
+    def update_config_item(self, elem_name: str, elem_val: Any) -> None:
         self._log.info("updated config: {}={}".format(elem_name, elem_val))
         self._config = replace(self._config, **{elem_name: elem_val})
         # Update the cached dict representation
@@ -129,7 +131,7 @@ class Pipette:
     def pipette_id(self) -> Optional[str]:
         return self._pipette_id
 
-    def critical_point(self, cp_override: CriticalPoint = None) -> Point:
+    def critical_point(self, cp_override: Optional[CriticalPoint] = None) -> Point:
         """
         The vector from the pipette's origin to its critical point. The
         critical point for a pipette is the end of the nozzle if no tip is
@@ -187,7 +189,7 @@ class Pipette:
         return self._current_tip_length
 
     @current_tip_length.setter
-    def current_tip_length(self, tip_length: float):
+    def current_tip_length(self, tip_length: float) -> None:
         self._current_tip_length = tip_length
 
     @property
@@ -196,7 +198,7 @@ class Pipette:
         return self._current_tiprack_diameter
 
     @current_tiprack_diameter.setter
-    def current_tiprack_diameter(self, diameter: float):
+    def current_tiprack_diameter(self, diameter: float) -> None:
         self._current_tiprack_diameter = diameter
 
     @property
@@ -205,7 +207,7 @@ class Pipette:
         return self._aspirate_flow_rate
 
     @aspirate_flow_rate.setter
-    def aspirate_flow_rate(self, new_flow_rate: float):
+    def aspirate_flow_rate(self, new_flow_rate: float) -> None:
         assert new_flow_rate > 0
         self._aspirate_flow_rate = new_flow_rate
 
@@ -215,7 +217,7 @@ class Pipette:
         return self._dispense_flow_rate
 
     @dispense_flow_rate.setter
-    def dispense_flow_rate(self, new_flow_rate: float):
+    def dispense_flow_rate(self, new_flow_rate: float) -> None:
         assert new_flow_rate > 0
         self._dispense_flow_rate = new_flow_rate
 
@@ -225,7 +227,7 @@ class Pipette:
         return self._blow_out_flow_rate
 
     @blow_out_flow_rate.setter
-    def blow_out_flow_rate(self, new_flow_rate: float):
+    def blow_out_flow_rate(self, new_flow_rate: float) -> None:
         assert new_flow_rate > 0
         self._blow_out_flow_rate = new_flow_rate
 
@@ -235,7 +237,7 @@ class Pipette:
         return self._working_volume
 
     @working_volume.setter
-    def working_volume(self, tip_volume: float):
+    def working_volume(self, tip_volume: float) -> None:
         """The working volume is the current tip max volume"""
         self._working_volume = min(self.config.max_volume, tip_volume)
 
@@ -244,16 +246,16 @@ class Pipette:
         """The amount of liquid possible to aspirate"""
         return self.working_volume - self.current_volume
 
-    def set_current_volume(self, new_volume: float):
+    def set_current_volume(self, new_volume: float) -> None:
         assert new_volume >= 0
         assert new_volume <= self.working_volume
         self._current_volume = new_volume
 
-    def add_current_volume(self, volume_incr: float):
+    def add_current_volume(self, volume_incr: float) -> None:
         assert self.ok_to_add_volume(volume_incr)
         self._current_volume += volume_incr
 
-    def remove_current_volume(self, volume_incr: float):
+    def remove_current_volume(self, volume_incr: float) -> None:
         assert self._current_volume >= volume_incr
         self._current_volume -= volume_incr
 
@@ -287,6 +289,9 @@ class Pipette:
     def has_tip(self) -> bool:
         return self._has_tip
 
+    # Cache max is chosen somewhat arbitrarily. With a float is input we don't
+    # want this to unbounded.
+    @functools.lru_cache(maxsize=100)
     def ul_per_mm(self, ul: float, action: UlPerMmAction) -> float:
         sequence = self._config.ul_per_mm[action]
         return pipette_config.piecewise_volume_conversion(ul, sequence)
@@ -461,6 +466,8 @@ def generate_hardware_configs_ot3(
             "steps_per_mm": 0,
             "home_pos": 0,
             "max_travel": 0,
-            "idle_current": robot_config.holding_current.none["P"],
+            "idle_current": robot_config.current_settings.hold_current.none[
+                OT3AxisKind.P
+            ],
             "splits": None,
         }

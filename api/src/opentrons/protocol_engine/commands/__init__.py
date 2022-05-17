@@ -13,6 +13,11 @@ they are part of the public input / output of the engine, and need validation
 and/or schema generation.
 """
 
+from . import heater_shaker
+from . import magnetic_module
+from . import temperature_module
+from . import thermocycler
+
 from .command import AbstractCommandImpl, BaseCommand, BaseCommandCreate, CommandStatus
 
 from .command_unions import (
@@ -86,14 +91,6 @@ from .load_pipette import (
     LoadPipetteCommandType,
 )
 
-from .magnetic_module_engage import (
-    MagneticModuleEngage,
-    MagneticModuleEngageParams,
-    MagneticModuleEngageCreate,
-    MagneticModuleEngageResult,
-    MagneticModuleEngageCommandType,
-)
-
 from .move_relative import (
     MoveRelative,
     MoveRelativeParams,
@@ -132,6 +129,14 @@ from .save_position import (
     SavePositionCreate,
     SavePositionResult,
     SavePositionCommandType,
+)
+
+from .set_rail_lights import (
+    SetRailLights,
+    SetRailLightsParams,
+    SetRailLightsCreate,
+    SetRailLightsResult,
+    SetRailLightsCommandType,
 )
 
 
@@ -194,12 +199,6 @@ __all__ = [
     "LoadPipetteParams",
     "LoadPipetteResult",
     "LoadPipetteCommandType",
-    # magnetic module engage command models
-    "MagneticModuleEngage",
-    "MagneticModuleEngageCreate",
-    "MagneticModuleEngageParams",
-    "MagneticModuleEngageResult",
-    "MagneticModuleEngageCommandType",
     # move relative command models
     "MoveRelative",
     "MoveRelativeParams",
@@ -230,4 +229,15 @@ __all__ = [
     "SavePositionCreate",
     "SavePositionResult",
     "SavePositionCommandType",
+    # set rail lights command models
+    "SetRailLights",
+    "SetRailLightsParams",
+    "SetRailLightsCreate",
+    "SetRailLightsResult",
+    "SetRailLightsCommandType",
+    # module command bundles
+    "heater_shaker",
+    "magnetic_module",
+    "temperature_module",
+    "thermocycler",
 ]

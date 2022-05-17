@@ -1,6 +1,6 @@
 export {
   aspirate,
-  awaitTemperature,
+  waitForTemperature,
   blowout,
   consolidate,
   distribute,
@@ -18,6 +18,7 @@ export {
   thermocyclerStateStep,
   touchTip,
   transfer,
+  heaterShaker,
 } from './commandCreators'
 
 export * from './robotStateSelectors'

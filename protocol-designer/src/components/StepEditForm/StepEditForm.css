@@ -155,13 +155,15 @@
   width: 2.275rem;
   height: 1.55rem;
   margin-right: 0.25rem;
-  border-radius: 2px;
-  border: 1px solid var(--c-med-gray);
   cursor: pointer;
+  border-radius: 2px;
+  border: 1px solid #c4c4c4;
 }
 
 .path_option.selected {
   background-color: var(--c-light-gray);
+  border-radius: 2px;
+  border: 1.5px solid var(--c-black);
 }
 
 .path_option.disabled {
@@ -294,6 +296,11 @@ and when that is implemented.
 .toggle_form_group {
   min-width: 20%;
   margin: 0 0 1rem 1.75rem;
+}
+
+.set_plate_latch_form_group {
+  min-width: 20%;
+  margin: 0 0 0 1.75rem;
 }
 
 .toggle_row {

@@ -1,3 +1,4 @@
+// @ts-nocheck TODO: remove this after https://github.com/Opentrons/opentrons/pull/10178 merges
 import merge from 'lodash/merge'
 import {
   THERMOCYCLER_MODULE_TYPE,
@@ -21,8 +22,8 @@ import type {
   ModuleOnlyParams,
   TCProfileParams,
   TemperatureParams,
-  ThermocyclerSetTargetBlockTemperatureArgs,
-} from '@opentrons/shared-data/protocol/types/schemaV4'
+  ThermocyclerSetTargetBlockTemperatureParams,
+} from '@opentrons/shared-data/protocol/types/schemaV6/command/module'
 import { InvariantContext, RobotState, ThermocyclerModuleState } from '../types'
 const forThermocyclerSetTargetBlockTemperature = makeImmutableStateUpdater(
   _forThermocyclerSetTargetBlockTemperature
@@ -81,10 +82,10 @@ interface TestCase<P> {
 }
 type TestCases<P> = Array<TestCase<P>>
 describe('thermocycler state updaters', () => {
-  const blockTempTestCase: TestCases<ThermocyclerSetTargetBlockTemperatureArgs> = [
+  const blockTempTestCase: TestCases<ThermocyclerSetTargetBlockTemperatureParams> = [
     {
       params: {
-        module: moduleId,
+        moduleId,
         temperature: 42,
       },
       moduleStateBefore: {
@@ -101,7 +102,7 @@ describe('thermocycler state updaters', () => {
   const temperatureParamsCases: TestCases<TemperatureParams> = [
     {
       params: {
-        module: moduleId,
+        moduleId,
         temperature: 42,
       },
       moduleStateBefore: {
@@ -116,7 +117,7 @@ describe('thermocycler state updaters', () => {
     },
     {
       params: {
-        module: moduleId,
+        moduleId,
         temperature: 42,
       },
       moduleStateBefore: {
@@ -134,7 +135,7 @@ describe('thermocycler state updaters', () => {
     },
     {
       params: {
-        module: moduleId,
+        moduleId,
         temperature: 41,
       },
       moduleStateBefore: {
@@ -154,7 +155,7 @@ describe('thermocycler state updaters', () => {
   const moduleOnlyParamsCases: TestCases<ModuleOnlyParams> = [
     {
       params: {
-        module: moduleId,
+        moduleId,
       },
       moduleStateBefore: {
         blockTargetTemp: 42,
@@ -168,7 +169,7 @@ describe('thermocycler state updaters', () => {
     },
     {
       params: {
-        module: moduleId,
+        moduleId,
       },
       moduleStateBefore: {
         lidTargetTemp: 42,
@@ -181,7 +182,7 @@ describe('thermocycler state updaters', () => {
     },
     {
       params: {
-        module: moduleId,
+        moduleId,
       },
       moduleStateBefore: {
         lidOpen: true,
@@ -194,7 +195,7 @@ describe('thermocycler state updaters', () => {
     },
     {
       params: {
-        module: moduleId,
+        moduleId,
       },
       moduleStateBefore: {
         lidOpen: false,
@@ -209,7 +210,7 @@ describe('thermocycler state updaters', () => {
   const profileCases: TestCases<TCProfileParams> = [
     {
       params: {
-        module: moduleId,
+        moduleId,
         profile: [],
         volume: 10,
       },
@@ -220,7 +221,7 @@ describe('thermocycler state updaters', () => {
     },
     {
       params: {
-        module: moduleId,
+        moduleId,
         profile: [
           {
             holdTime: 10,
@@ -248,7 +249,7 @@ describe('thermocycler state updaters', () => {
     },
     {
       params: {
-        module: moduleId,
+        moduleId,
         profile: [
           {
             holdTime: 10,
@@ -276,7 +277,7 @@ describe('thermocycler state updaters', () => {
     },
     {
       params: {
-        module: moduleId,
+        moduleId,
         profile: [
           {
             holdTime: 10,

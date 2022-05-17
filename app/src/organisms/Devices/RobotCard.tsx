@@ -5,84 +5,111 @@ import { Link } from 'react-router-dom'
 import {
   Box,
   Flex,
-  Icon,
-  Text,
   ALIGN_CENTER,
   ALIGN_START,
-  C_BLUE,
   C_MED_LIGHT_GRAY,
   C_WHITE,
   DIRECTION_COLUMN,
   DIRECTION_ROW,
-  SIZE_2,
-  SPACING_2,
-  SPACING_3,
+  SPACING,
   TEXT_TRANSFORM_UPPERCASE,
+  BORDERS,
 } from '@opentrons/components'
+import { getModuleDisplayName } from '@opentrons/shared-data'
 
 import OT2_PNG from '../../assets/images/OT2-R_HERO.png'
-import { ModuleIcon } from './ModuleIcon'
+import { StyledText } from '../../atoms/text'
+import { UNREACHABLE } from '../../redux/discovery'
+import { ModuleIcon } from '../../molecules/ModuleIcon'
 import { useAttachedModules, useAttachedPipettes } from './hooks'
 import { RobotStatusBanner } from './RobotStatusBanner'
+import { RobotOverflowMenu } from './RobotOverflowMenu'
 
 import type { DiscoveredRobot } from '../../redux/discovery/types'
+// import { UpdateRobotBanner } from '../UpdateRobotBanner'
 
-type RobotCardProps = Pick<DiscoveredRobot, 'name' | 'local'>
+interface RobotCardProps {
+  robot: DiscoveredRobot
+}
 
 export function RobotCard(props: RobotCardProps): JSX.Element | null {
-  const { name = null, local } = props
+  const { robot } = props
+  const { name = null, local } = robot
   const { t } = useTranslation('devices_landing')
-
   const attachedModules = useAttachedModules(name)
   const attachedPipettes = useAttachedPipettes(name)
 
   return name != null ? (
-    <Flex
-      alignItems={ALIGN_CENTER}
-      backgroundColor={C_WHITE}
-      border={`1px solid ${C_MED_LIGHT_GRAY}`}
-      borderRadius="4px"
-      flexDirection={DIRECTION_ROW}
-      marginBottom={SPACING_2}
-      padding={SPACING_2}
-      width="100%"
-    >
-      <img src={OT2_PNG} style={{ width: '6rem' }} />
-      <Box padding={SPACING_2} width="100%">
-        <RobotStatusBanner name={name} local={local} />
-        <Flex>
-          <Flex flexDirection={DIRECTION_COLUMN} paddingRight={SPACING_3}>
-            <Text textTransform={TEXT_TRANSFORM_UPPERCASE}>
-              {t('left_mount')}
-            </Text>
-            <Text>
-              {attachedPipettes?.left?.modelSpecs.displayName ?? t('empty')}
-            </Text>
-          </Flex>
-          <Flex flexDirection={DIRECTION_COLUMN} paddingRight={SPACING_3}>
-            <Text textTransform={TEXT_TRANSFORM_UPPERCASE}>
-              {t('right_mount')}
-            </Text>
-            <Text>
-              {attachedPipettes?.right?.modelSpecs.displayName ?? t('empty')}
-            </Text>
-          </Flex>
-          <Flex flexDirection={DIRECTION_COLUMN} paddingRight={SPACING_3}>
-            <Text textTransform={TEXT_TRANSFORM_UPPERCASE}>{t('modules')}</Text>
-            <Flex>
-              {attachedModules.map(module => (
-                <ModuleIcon key={module.model} moduleType={module.type} />
-              ))}
+    <Link to={`/devices/${name}`} style={{ color: 'inherit' }}>
+      <Flex
+        alignItems={ALIGN_CENTER}
+        backgroundColor={C_WHITE}
+        border={`1px solid ${C_MED_LIGHT_GRAY}`}
+        borderRadius={BORDERS.radiusSoftCorners}
+        flexDirection={DIRECTION_ROW}
+        marginBottom={SPACING.spacing3}
+        padding={SPACING.spacing3}
+        width="100%"
+      >
+        <img
+          src={OT2_PNG}
+          style={{ width: '6rem' }}
+          id={`RobotCard_${name}_robotImage`}
+        />
+        <Box padding={SPACING.spacing3} width="100%">
+          {/* TODO: uncomment this when we prevent all nested clicks from triggering a route change * <UpdateRobotBanner robotName={name} marginBottom={SPACING.spacing3} /> */}
+          {robot.status !== UNREACHABLE ? (
+            <RobotStatusBanner name={name} local={local} />
+          ) : null}
+          <Flex>
+            <Flex
+              flexDirection={DIRECTION_COLUMN}
+              paddingRight={SPACING.spacing4}
+            >
+              <StyledText as="h6" textTransform={TEXT_TRANSFORM_UPPERCASE}>
+                {t('left_mount')}
+              </StyledText>
+              <StyledText as="p" id={`RobotCard_${name}_leftMountPipette`}>
+                {attachedPipettes?.left?.modelSpecs.displayName ?? t('empty')}
+              </StyledText>
+            </Flex>
+            <Flex
+              flexDirection={DIRECTION_COLUMN}
+              paddingRight={SPACING.spacing4}
+            >
+              <StyledText as="h6" textTransform={TEXT_TRANSFORM_UPPERCASE}>
+                {t('right_mount')}
+              </StyledText>
+              <StyledText as="p" id={`RobotCard_${name}_rightMountPipette`}>
+                {attachedPipettes?.right?.modelSpecs.displayName ?? t('empty')}
+              </StyledText>
+            </Flex>
+            <Flex
+              flexDirection={DIRECTION_COLUMN}
+              paddingRight={SPACING.spacing4}
+            >
+              <StyledText as="h6" textTransform={TEXT_TRANSFORM_UPPERCASE}>
+                {t('modules')}
+              </StyledText>
+              <Flex>
+                {attachedModules.map((module, i) => (
+                  <ModuleIcon
+                    key={`${module.moduleModel}_${i}_${name}`}
+                    tooltipText={t(
+                      'this_robot_has_connected_and_power_on_module',
+                      {
+                        moduleName: getModuleDisplayName(module.moduleModel),
+                      }
+                    )}
+                    module={module}
+                  />
+                ))}
+              </Flex>
             </Flex>
           </Flex>
-        </Flex>
-      </Box>
-      {/* temp link from three dot menu to device detail page. Robot actions menu covered in ticket #8673 */}
-      <Box alignSelf={ALIGN_START}>
-        <Link to={`/devices/${name}`}>
-          <Icon name="dots-horizontal" color={C_BLUE} size={SIZE_2} />
-        </Link>
-      </Box>
-    </Flex>
+        </Box>
+        <RobotOverflowMenu robot={robot} alignSelf={ALIGN_START} />
+      </Flex>
+    </Link>
   ) : null
 }

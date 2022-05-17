@@ -1,7 +1,7 @@
 """Utils for motion planning."""
-import numpy as np  # type: ignore[import]
+import numpy as np
 import logging
-from typing import Iterator, List, Tuple
+from typing import Iterator, List, Tuple, Set, TYPE_CHECKING, cast
 
 from opentrons_hardware.hardware_control.motion_planning.types import (
     Block,
@@ -9,10 +9,15 @@ from opentrons_hardware.hardware_control.motion_planning.types import (
     Move,
     MoveTarget,
     AxisConstraints,
+    CoordinateValue,
+    AxisKey,
     SystemConstraints,
-    AXIS_NAMES,
     ZeroLengthMoveError,
+    vectorize,
 )
+
+if TYPE_CHECKING:
+    from numpy.typing import NDArray
 
 log = logging.getLogger(__name__)
 
@@ -20,59 +25,74 @@ log = logging.getLogger(__name__)
 FLOAT_THRESHOLD = 0.001  # TODO: re-evaluate this value based on system limitations
 
 
+class MoveConditionNotMet(ValueError):
+    """Error raised if a move does not meet its stop condition before finishing."""
+
+
 def apply_constraint(constraint: np.float64, input: np.float64) -> np.float64:
     """Keep the sign of the input but cap the numeric value at the constraint value."""
-    return np.copysign(np.minimum(abs(constraint), abs(input)), input)
+    return cast(np.float64, np.copysign(np.minimum(abs(constraint), abs(input)), input))
 
 
 def check_less_or_close(constraint: np.float64, input: np.float64) -> bool:
     """Evaluate whether the input value equals to or less than the constraint."""
-    return abs(input) <= constraint or bool(np.isclose(input, constraint))
+    return bool(abs(input) <= constraint or bool(np.isclose(input, constraint)))
 
 
 def get_unit_vector(
-    initial: Coordinates, target: Coordinates
-) -> Tuple[Coordinates, np.float64]:
+    initial: Coordinates[AxisKey, CoordinateValue],
+    target: Coordinates[AxisKey, CoordinateValue],
+) -> Tuple[Coordinates[AxisKey, np.float64], np.float64]:
     """Get the unit vector and the distance the two coordinates."""
-    initial_vectorized = initial.vectorize()
-    target_vectorized = target.vectorize()
-    displacement: np.ndarray = target_vectorized - initial_vectorized
-    distance = np.linalg.norm(displacement)
+    initial_vectorized = vectorize({k: np.float64(v) for k, v in initial.items()})
+    target_vectorized = vectorize({k: np.float64(v) for k, v in target.items()})
+    displacement: "NDArray[np.float64]" = target_vectorized - initial_vectorized
+    distance = np.linalg.norm(displacement)  # type: ignore[no-untyped-call]
     if not distance or np.array_equal(initial_vectorized, target_vectorized):
         raise ZeroLengthMoveError(initial, target)
-    unit_vector = Coordinates.from_iter(displacement / distance)
+    unit_vector_ndarray = displacement / distance
+    unit_vector = {k: v for k, v in zip(initial.keys(), unit_vector_ndarray)}
     return unit_vector, distance
 
 
-def targets_to_moves(initial: Coordinates, targets: List[MoveTarget]) -> Iterator[Move]:
+def targets_to_moves(
+    initial: Coordinates[AxisKey, CoordinateValue], targets: List[MoveTarget[AxisKey]]
+) -> Iterator[Move[AxisKey]]:
     """Transform a list of MoveTargets into a list of Moves."""
+    all_axes: Set[AxisKey] = set()
     for target in targets:
-        unit_vector, distance = get_unit_vector(initial, target.position)
+        all_axes.update(set(target.position.keys()))
+
+    initial_checked = {k: np.float64(initial.get(k, 0)) for k in all_axes}
+    for target in targets:
+        position = {k: np.float64(target.position.get(k, 0)) for k in all_axes}
+        unit_vector, distance = get_unit_vector(initial_checked, position)
+        third_distance = np.float64(distance / 3)
         m = Move(
             unit_vector=unit_vector,
             distance=distance,
             max_speed=target.max_speed,
             blocks=(
                 Block(
-                    distance=distance / 3,
+                    distance=third_distance,
                     initial_speed=target.max_speed,
-                    acceleration=0,
+                    acceleration=np.float64(0),
                 ),
                 Block(
-                    distance=distance / 3,
+                    distance=third_distance,
                     initial_speed=target.max_speed,
-                    acceleration=0,
+                    acceleration=np.float64(0),
                 ),
                 Block(
-                    distance=distance / 3,
+                    distance=third_distance,
                     initial_speed=target.max_speed,
-                    acceleration=0,
+                    acceleration=np.float64(0),
                 ),
             ),
         )
         log.debug(f"Built move from {initial} to {target} as {m}")
         yield m
-        initial = target.position
+        initial_checked = position
 
 
 def initial_speed_limit_from_axis(
@@ -114,13 +134,15 @@ def initial_speed_limit_from_axis(
 
 
 def find_initial_speed(
-    constraints: SystemConstraints, move: Move, prev_move: Move
+    constraints: SystemConstraints[AxisKey],
+    move: Move[AxisKey],
+    prev_move: Move[AxisKey],
 ) -> np.float64:
     """Get a move's initial speed."""
     log = logging.getLogger("find_initial_speed")
     # Figure out how fast we can be going when we start
     initial_speed = move.initial_speed
-    for axis in AXIS_NAMES:
+    for axis in move.unit_vector.keys():
         axis_component = move.unit_vector[axis]
 
         if abs(axis_component * initial_speed) < FLOAT_THRESHOLD:
@@ -188,16 +210,16 @@ def final_speed_limit_from_axis(
 
 
 def find_final_speed(
-    constraints: SystemConstraints,
-    move: Move,
-    next_move: Move,
+    constraints: SystemConstraints[AxisKey],
+    move: Move[AxisKey],
+    next_move: Move[AxisKey],
 ) -> np.float64:
     """Get a move's final speed."""
     log = logging.getLogger("find_final_speed")
     # Figure out how fast we can be going when we stop
     final_speed: np.float64 = move.final_speed
 
-    for axis in AXIS_NAMES:
+    for axis in move.unit_vector.keys():
         axis_component = move.unit_vector[axis]
         if abs(axis_component * final_speed) < FLOAT_THRESHOLD:
             log.debug(f"Skip {axis} because it is not moving")
@@ -225,8 +247,8 @@ def find_final_speed(
 
 
 def achievable_final(
-    constraints: SystemConstraints,
-    move: Move,
+    constraints: SystemConstraints[AxisKey],
+    move: Move[AxisKey],
     initial_speed: np.float64,
     final_speed: np.float64,
 ) -> np.float64:
@@ -234,7 +256,7 @@ def achievable_final(
     log = logging.getLogger("achievable_final")
     # Figure out whether this final speed is in fact achievable from the initial speed
     # in the distance allowed
-    for axis in AXIS_NAMES:
+    for axis in move.unit_vector.keys():
         axis_component = move.unit_vector[axis]
         if axis_component:
             axis_max_acc = constraints[axis].max_acceleration
@@ -262,12 +284,12 @@ def achievable_final(
 
 
 def build_blocks(
-    unit_vector: Coordinates,
+    unit_vector: Coordinates[AxisKey, np.float64],
     initial_speed: np.float64,
     final_speed: np.float64,
     distance: np.float64,
     max_speed: np.float64,
-    constraints: SystemConstraints,
+    constraints: SystemConstraints[AxisKey],
 ) -> Tuple[Block, Block, Block]:
     """Build blocks for a move.
 
@@ -289,16 +311,16 @@ def build_blocks(
     max_acc = np.array(
         [
             constraints[axis].max_acceleration if unit_vector[axis] else 0.0
-            for axis in AXIS_NAMES
+            for axis in unit_vector.keys()
         ]
     )
-    max_acc_magnitude = np.linalg.norm(max_acc)
-    acc_v = max_acc_magnitude * unit_vector.vectorize()
+    max_acc_magnitude = np.linalg.norm(max_acc)  # type: ignore[no-untyped-call]
+    acc_v = max_acc_magnitude * vectorize(unit_vector)
 
     for a_i, max_acc_i in zip(acc_v, max_acc):
         if abs(a_i) > max_acc_i:
             acc_v *= max_acc_i / a_i
-    max_acceleration = np.linalg.norm(acc_v)
+    max_acceleration = np.linalg.norm(acc_v)  # type: ignore[no-untyped-call]
 
     initial_speed_sq = initial_speed**2
     final_speed_sq = final_speed**2
@@ -336,30 +358,32 @@ def build_blocks(
         # ratio between the acceleration and deceleration phases is quite imbalanced.
         # We can always fall back to having our target maximum speed be the larger
         # of the final and initial speeds.
-        max_speed_sq = max(initial_speed_sq, final_speed_sq)
-        first.distance = abs(max_speed_sq - initial_speed_sq) / (2 * max_acceleration)
+        max_speed_sq = np.maximum(initial_speed_sq, final_speed_sq)
+        first.distance = np.abs(max_speed_sq - initial_speed_sq) / (
+            2 * max_acceleration
+        )
         final.initial_speed = first.final_speed
-        final.distance = abs(max_speed_sq - final_speed_sq) / (2 * max_acceleration)
+        final.distance = np.abs(max_speed_sq - final_speed_sq) / (2 * max_acceleration)
 
     if first.distance + final.distance < distance:
         # we'll have a coast phase!
         coast = Block(
             initial_speed=final.initial_speed,
-            acceleration=0,
+            acceleration=np.float64(0),
             distance=distance - first.distance - final.distance,
         )
         return first, coast, final
     else:
         # no coast phase for us
-        return first, Block(0, 0, 0), final
+        return first, Block(np.float64(0), np.float64(0), np.float64(0)), final
 
 
 def build_move(
-    move: Move,
-    prev_move: Move,
-    next_move: Move,
-    constraints: SystemConstraints,
-) -> Move:
+    move: Move[AxisKey],
+    prev_move: Move[AxisKey],
+    next_move: Move[AxisKey],
+    constraints: SystemConstraints[AxisKey],
+) -> Move[AxisKey]:
     """Build a move."""
     log = logging.getLogger("build_move")
 
@@ -384,12 +408,14 @@ def build_move(
     return m
 
 
-def blended(constraints: SystemConstraints, first: Move, second: Move) -> bool:
+def blended(
+    constraints: SystemConstraints[AxisKey], first: Move[AxisKey], second: Move[AxisKey]
+) -> bool:
     """Check if the moves are blended."""
     log = logging.getLogger("blended")
     # have these actually had their blocks built?
     first_dist_sum = sum(b.distance for b in first.blocks)
-    if (abs(first_dist_sum - first.distance) > FLOAT_THRESHOLD) or not np.isclose(
+    if (np.abs(first_dist_sum - first.distance) > FLOAT_THRESHOLD) or not np.isclose(
         first_dist_sum, first.distance
     ):
         log.debug(
@@ -398,7 +424,7 @@ def blended(constraints: SystemConstraints, first: Move, second: Move) -> bool:
         )
         return False
     second_dist_sum = sum(b.distance for b in second.blocks)
-    if abs(second_dist_sum - second.distance) > FLOAT_THRESHOLD or not np.isclose(
+    if np.abs(second_dist_sum - second.distance) > FLOAT_THRESHOLD or not np.isclose(
         second_dist_sum, second.distance
     ):
         log.debug(
@@ -408,7 +434,7 @@ def blended(constraints: SystemConstraints, first: Move, second: Move) -> bool:
         return False
 
     # do their junction velocities match constraints?
-    for axis in AXIS_NAMES:
+    for axis in first.unit_vector.keys():
         final_speed = first.blocks[-1].final_speed * first.unit_vector[axis]
         log.debug(f"{axis} final_speed: {final_speed}")
         initial_speed = second.blocks[0].initial_speed * second.unit_vector[axis]
@@ -417,7 +443,7 @@ def blended(constraints: SystemConstraints, first: Move, second: Move) -> bool:
             # if they're in the same direction, we can check that either the junction
             # speeds exactly match, or that they're both under the discontinuity limit
             discont_limit = constraints[axis].max_speed_discont
-            if not (abs(initial_speed - final_speed) < FLOAT_THRESHOLD):
+            if not (np.abs(initial_speed - final_speed) < FLOAT_THRESHOLD):
                 if not (
                     check_less_or_close(discont_limit, final_speed)
                     or check_less_or_close(discont_limit, initial_speed)
@@ -444,7 +470,9 @@ def blended(constraints: SystemConstraints, first: Move, second: Move) -> bool:
     return True
 
 
-def all_blended(constraints: SystemConstraints, moves: List[Move]) -> bool:
+def all_blended(
+    constraints: SystemConstraints[AxisKey], moves: List[Move[AxisKey]]
+) -> bool:
     """Check if the moves in the list are all blended."""
     moveiter = iter(moves)
     prev = next(moveiter)
@@ -459,8 +487,8 @@ def all_blended(constraints: SystemConstraints, moves: List[Move]) -> bool:
 
 
 def unit_vector_multiplication(
-    unit_vector: Coordinates, value: np.float64
-) -> Coordinates:
+    unit_vector: Coordinates[AxisKey, np.float64], value: np.float64
+) -> Coordinates[AxisKey, np.float64]:
     """Multiply coordinates type by a float value."""
-    targets: np.ndarray = unit_vector.vectorize() * value
-    return Coordinates.from_iter(targets)
+    targets: "NDArray[np.float64]" = vectorize(unit_vector) * value
+    return {k: v for k, v in zip(unit_vector.keys(), targets)}

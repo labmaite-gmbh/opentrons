@@ -1,31 +1,30 @@
 import * as React from 'react'
 import { useSelector } from 'react-redux'
 import cx from 'classnames'
-import { RobotCoordsForeignDiv } from '@opentrons/components'
+import { RobotCoordsForeignDiv, Text } from '@opentrons/components'
 import {
   getModuleVizDims,
   MAGNETIC_MODULE_TYPE,
   TEMPERATURE_MODULE_TYPE,
   THERMOCYCLER_MODULE_TYPE,
+  HEATERSHAKER_MODULE_TYPE,
   ModuleType,
   ModuleOrientation,
 } from '@opentrons/shared-data'
 import {
+  ModuleTemporalProperties,
+  TemperatureModuleState,
   TEMPERATURE_AT_TARGET,
   TEMPERATURE_APPROACHING_TARGET,
   TEMPERATURE_DEACTIVATED,
 } from '@opentrons/step-generation'
 import { i18n } from '../../localization'
 import { timelineFrameBeforeActiveItem } from '../../top-selectors/timelineFrames'
-import {
-  selectors as stepFormSelectors,
-  ModuleTemporalProperties,
-  TemperatureModuleState,
-} from '../../step-forms'
+import { selectors as stepFormSelectors } from '../../step-forms'
 import { STD_SLOT_X_DIM, STD_SLOT_Y_DIM } from '../../constants'
 import * as uiSelectors from '../../ui/steps'
 import { getLabwareOnModule } from '../../ui/modules/utils'
-import { makeTemperatureText } from '../../utils'
+import { makeSpeedText, makeTemperatureText } from '../../utils'
 import styles from './ModuleTag.css'
 
 export interface ModuleTagProps {
@@ -41,6 +40,9 @@ const STANDARD_TAG_WIDTH = 65
 // thermocycler has its slot farther right = more width, and it has more lines of content = more height
 const THERMOCYCLER_TAG_HEIGHT = 70
 const THERMOCYCLER_TAG_WIDTH = 75
+// heater shaker has three statuses requiring more lines of content = more height
+const HEATERSHAKER_TAG_HEIGHT = 85
+const HEATERSHAKER_TAG_WIDTH = 80
 
 function getTempStatus(temperatureModuleState: TemperatureModuleState): string {
   const { targetTemperature, status } = temperatureModuleState
@@ -109,7 +111,35 @@ export const ModuleStatus = ({
           <div />
         </>
       )
-
+    case HEATERSHAKER_MODULE_TYPE:
+      let latchStatus = null
+      switch (moduleState.latchOpen) {
+        case true:
+          latchStatus = i18n.t('modules.lid_open')
+          break
+        case false:
+          latchStatus = i18n.t('modules.lid_closed')
+          break
+        default:
+          latchStatus = i18n.t('modules.lid_undefined')
+      }
+      return (
+        <>
+          <div className={styles.module_status_line}>
+            <Text paddingBottom="2px">{i18n.t('modules.heater_label')}:</Text>
+            <Text>{makeTemperatureText(moduleState.targetTemp)}</Text>
+          </div>
+          <div className={styles.module_status_line}>
+            <Text paddingBottom="2px">{i18n.t('modules.shaker_label')}:</Text>
+            <Text>{makeSpeedText(moduleState.targetSpeed)}</Text>
+          </div>
+          <div className={styles.module_status_line}>
+            <Text paddingBottom="2px"> {i18n.t('modules.labware_latch')}:</Text>
+            <Text>{latchStatus}</Text>
+          </div>
+          <div />
+        </>
+      )
     default:
       console.warn(
         // @ts-expect-error (ce, 2021-07-21) doesn't think `type` exists on type never (clever TS)
@@ -118,7 +148,6 @@ export const ModuleStatus = ({
       return null
   }
 }
-
 const ModuleTagComponent = (props: ModuleTagProps): JSX.Element | null => {
   const timelineFrame = useSelector(timelineFrameBeforeActiveItem)
   const moduleEntity = useSelector(stepFormSelectors.getModuleEntities)[
@@ -153,6 +182,9 @@ const ModuleTagComponent = (props: ModuleTagProps): JSX.Element | null => {
   if (moduleType === THERMOCYCLER_MODULE_TYPE) {
     tagHeight = THERMOCYCLER_TAG_HEIGHT
     tagWidth = THERMOCYCLER_TAG_WIDTH
+  } else if (moduleType === HEATERSHAKER_MODULE_TYPE) {
+    tagHeight = HEATERSHAKER_TAG_HEIGHT
+    tagWidth = HEATERSHAKER_TAG_WIDTH
   }
 
   const { childXOffset, childYOffset } = getModuleVizDims(

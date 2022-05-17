@@ -42,6 +42,7 @@ CONFIG_ANALYZER_SPECS: List[ConfigAnalyzerSpec] = [
         main_file=RoleAnalysisFile(
             name="protocol.py",
             data=None,
+            path=None,
             role=ProtocolFileRole.MAIN,
             contents=textwrap.dedent(
                 """
@@ -62,6 +63,7 @@ CONFIG_ANALYZER_SPECS: List[ConfigAnalyzerSpec] = [
             name="protocol.json",
             role=ProtocolFileRole.MAIN,
             contents=b"",
+            path=None,
             data=JsonProtocol.parse_raw(
                 load_shared_data("protocol/fixtures/5/simpleV5.json")
             ),
@@ -82,6 +84,7 @@ CONFIG_ANALYZER_SPECS: List[ConfigAnalyzerSpec] = [
             name="protocol.json",
             role=ProtocolFileRole.MAIN,
             contents=b"",
+            path=None,
             data=JsonProtocol.parse_raw(
                 load_shared_data("protocol/fixtures/4/simpleV4.json")
             ),
@@ -102,6 +105,7 @@ CONFIG_ANALYZER_SPECS: List[ConfigAnalyzerSpec] = [
             name="protocol.json",
             role=ProtocolFileRole.MAIN,
             contents=b"",
+            path=None,
             data=JsonProtocol.parse_raw(
                 load_shared_data("protocol/fixtures/3/simple.json")
             ),
@@ -117,6 +121,26 @@ CONFIG_ANALYZER_SPECS: List[ConfigAnalyzerSpec] = [
             config=JsonProtocolConfig(schema_version=3),
         ),
     ),
+    ConfigAnalyzerSpec(
+        main_file=RoleAnalysisFile(
+            name="protocol.PY",
+            data=None,
+            path=None,
+            role=ProtocolFileRole.MAIN,
+            contents=textwrap.dedent(
+                """
+                metadata = {
+                    "author": "Dr. Sy. N. Tist",
+                    "apiLevel": "123.456",
+                }
+                """
+            ).encode(),
+        ),
+        expected=ConfigAnalysis(
+            metadata={"author": "Dr. Sy. N. Tist", "apiLevel": "123.456"},
+            config=PythonProtocolConfig(api_version=APIVersion(123, 456)),
+        ),
+    ),
 ]
 
 
@@ -128,6 +152,7 @@ CONFIG_ANALYZER_ERROR_SPECS: List[ConfigAnalyzerErrorSpec] = [
         main_file=RoleAnalysisFile(
             name="protocol.py",
             data=None,
+            path=None,
             role=ProtocolFileRole.MAIN,
             contents=textwrap.dedent(
                 """
@@ -146,6 +171,7 @@ CONFIG_ANALYZER_ERROR_SPECS: List[ConfigAnalyzerErrorSpec] = [
         main_file=RoleAnalysisFile(
             name="protocol.py",
             data=None,
+            path=None,
             role=ProtocolFileRole.MAIN,
             contents=textwrap.dedent(
                 """
@@ -159,6 +185,7 @@ CONFIG_ANALYZER_ERROR_SPECS: List[ConfigAnalyzerErrorSpec] = [
         main_file=RoleAnalysisFile(
             name="protocol.py",
             data=None,
+            path=None,
             role=ProtocolFileRole.MAIN,
             contents=textwrap.dedent(
                 """
@@ -173,6 +200,7 @@ CONFIG_ANALYZER_ERROR_SPECS: List[ConfigAnalyzerErrorSpec] = [
         main_file=RoleAnalysisFile(
             name="protocol.py",
             data=None,
+            path=None,
             role=ProtocolFileRole.MAIN,
             contents=textwrap.dedent(
                 """
@@ -187,6 +215,7 @@ CONFIG_ANALYZER_ERROR_SPECS: List[ConfigAnalyzerErrorSpec] = [
         main_file=RoleAnalysisFile(
             name="protocol.py",
             data=None,
+            path=None,
             role=ProtocolFileRole.MAIN,
             contents=textwrap.dedent(
                 """
@@ -201,6 +230,7 @@ CONFIG_ANALYZER_ERROR_SPECS: List[ConfigAnalyzerErrorSpec] = [
         main_file=RoleAnalysisFile(
             name="protocol.py",
             data=None,
+            path=None,
             role=ProtocolFileRole.MAIN,
             contents=textwrap.dedent(
                 """
@@ -218,6 +248,7 @@ CONFIG_ANALYZER_ERROR_SPECS: List[ConfigAnalyzerErrorSpec] = [
         main_file=RoleAnalysisFile(
             name="protocol.py",
             data=None,
+            path=None,
             role=ProtocolFileRole.MAIN,
             contents=textwrap.dedent(
                 """

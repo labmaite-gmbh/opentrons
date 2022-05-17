@@ -3,6 +3,7 @@ import cx from 'classnames'
 import sum from 'lodash/sum'
 import { Icon } from '@opentrons/components'
 import {
+  HEATERSHAKER_MODULE_TYPE,
   MAGNETIC_MODULE_TYPE,
   TEMPERATURE_MODULE_TYPE,
   THERMOCYCLER_MODULE_TYPE,
@@ -18,7 +19,12 @@ import {
   ProfileStepItem,
 } from '../../form-types'
 import { i18n } from '../../localization'
-import { makeLidLabelText, makeTemperatureText } from '../../utils'
+import {
+  makeLidLabelText,
+  makeSpeedText,
+  makeTemperatureText,
+  makeTimerText,
+} from '../../utils'
 import { PDListItem, TitledStepList } from '../lists'
 import { TitledListNotes } from '../TitledListNotes'
 import { AspirateDispenseHeader } from './AspirateDispenseHeader'
@@ -329,6 +335,47 @@ export const StepItemContents = (
     )
   }
 
+  if (substeps && substeps.substepType === 'heaterShaker') {
+    const temperature = makeTemperatureText(
+      substeps.targetHeaterShakerTemperature
+    )
+    const shakerValue = makeSpeedText(substeps.targetSpeed)
+    const timer = makeTimerText(
+      substeps.heaterShakerTimerMinutes,
+      substeps.heaterShakerTimerSeconds
+    )
+
+    return (
+      <ModuleStepItems
+        action={i18n.t(`modules.actions.go_to`)}
+        actionText={temperature}
+        moduleType={HEATERSHAKER_MODULE_TYPE}
+        labwareNickname={substeps.labwareNickname}
+      >
+        <ModuleStepItemRow
+          label={i18n.t(`modules.labware_latch`)}
+          value={
+            substeps.latchOpen
+              ? i18n.t(`modules.actions.open`)
+              : i18n.t(`modules.actions.closed_and_locked`)
+          }
+        />
+        <ModuleStepItemRow
+          label={i18n.t(`modules.shaker_label`)}
+          value={shakerValue}
+        />
+        {timer == null ? null : (
+          <ModuleStepItemRow
+            label={
+              timer == null ? null : i18n.t(`modules.actions.deactivate_after`)
+            }
+            value={timer}
+          />
+        )}
+      </ModuleStepItems>
+    )
+  }
+
   if (substeps && substeps.substepType === THERMOCYCLER_PROFILE) {
     return (
       <ModuleStepItems
@@ -414,7 +461,7 @@ export const StepItemContents = (
     )
   }
 
-  if (substeps && substeps.substepType === 'awaitTemperature') {
+  if (substeps && substeps.substepType === 'waitForTemperature') {
     const temperature = makeTemperatureText(substeps.temperature)
 
     return (
@@ -422,7 +469,7 @@ export const StepItemContents = (
         message={substeps.message}
         action={i18n.t('modules.actions.await_temperature')}
         actionText={temperature}
-        moduleType={TEMPERATURE_MODULE_TYPE}
+        moduleType={substeps.moduleType}
         labwareNickname={substeps.labwareNickname}
       />
     )

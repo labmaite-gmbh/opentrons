@@ -4,6 +4,7 @@ import {
   PauseArgs,
   ThermocyclerProfileStepArgs,
 } from '@opentrons/step-generation'
+import { ModuleType } from '@opentrons/shared-data'
 import { StepIdType } from '../form-types'
 import { FormError } from './formLevel/errors'
 // timeline start and end
@@ -29,8 +30,8 @@ export type WellIngredientVolumeData =
     }
 
 export interface TipLocation {
-  labware: string
-  well: string
+  labwareId: string
+  wellName: string
 }
 export type SubstepIdentifier = {
   stepId: StepIdType
@@ -109,12 +110,24 @@ export interface PauseSubstepItem {
   substepType: 'pause'
   pauseStepArgs: PauseArgs // Pause substeps use same data as processed form
 }
-export interface AwaitTemperatureSubstepItem {
-  substepType: 'awaitTemperature'
+export interface WaitForTemperatureSubstepItem {
+  substepType: 'waitForTemperature'
   temperature: number
   labwareNickname: string | null | undefined
+  moduleType: ModuleType
   message?: string
 }
+
+export interface HeaterShakerSubstepItem {
+  substepType: 'heaterShaker'
+  labwareNickname: string | null | undefined
+  targetHeaterShakerTemperature: number | null
+  targetSpeed: number | null
+  latchOpen: boolean
+  heaterShakerTimerMinutes: number | null
+  heaterShakerTimerSeconds: number | null
+}
+
 export interface ThermocyclerProfileSubstepItem {
   substepType: typeof THERMOCYCLER_PROFILE
   blockTargetTempHold: number | null
@@ -140,9 +153,10 @@ export type SubstepItemData =
   | PauseSubstepItem
   | MagnetSubstepItem
   | TemperatureSubstepItem
-  | AwaitTemperatureSubstepItem
+  | WaitForTemperatureSubstepItem
   | ThermocyclerProfileSubstepItem
   | ThermocyclerStateSubstepItem
+  | HeaterShakerSubstepItem
 export type Substeps = Record<StepIdType, SubstepItemData | null | undefined>
 export type StepFormErrors = FormError[]
 export interface StepArgsAndErrors {

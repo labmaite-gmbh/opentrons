@@ -22,7 +22,7 @@ on:
       - 'package.json'
       - '.github/workflows/pd-test-build-deploy.yaml'
     branches:
-      - '*'
+      - '**'
     tags:
       - 'protocol-designer*'
   workflow_dispatch:
@@ -52,7 +52,7 @@ jobs:
           path: |
             ${{ github.workspace }}/.yarn-cache
             ${{ github.workspace }}/.npm-cache
-          key: js-${{ secrets.GH_CACHE_VERSION }}-${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+          key: js-${{ secrets.GH_CACHE_VERSION }}-${{ runner.os }}-yarn-${{ hashFiles('yarn.lock') }}
           restore-keys: |
             js-${{ secrets.GH_CACHE_VERSION }}-${{ runner.os }}-yarn-
       - name: 'setup-js'
@@ -68,9 +68,10 @@ jobs:
         with:
           files: ./coverage/lcov.info
           flags: protocol-designer
-  
+
   e2e-test:
     name: 'pd e2e tests'
+    needs: ['js-unit-test']
     timeout-minutes: 30
     strategy:
       matrix:
@@ -90,7 +91,7 @@ jobs:
           path: |
             ${{ github.workspace }}/.yarn-cache
             ${{ github.workspace }}/.npm-cache
-          key: js-${{ secrets.GH_CACHE_VERSION }}-${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+          key: js-${{ secrets.GH_CACHE_VERSION }}-${{ runner.os }}-yarn-${{ hashFiles('yarn.lock') }}
           restore-keys: |
             js-${{ secrets.GH_CACHE_VERSION }}-${{ runner.os }}-yarn-
       - name: 'setup-js'
@@ -102,6 +103,7 @@ jobs:
         run: make -C protocol-designer test-e2e
   build-pd:
     name: 'build protocol designer artifact'
+    needs: ['js-unit-test']
     runs-on: 'ubuntu-18.04'
     if: github.event_name != 'pull_request'
     steps:
@@ -117,7 +119,7 @@ jobs:
           path: |
             ${{ github.workspace }}/.yarn-cache
             ${{ github.workspace }}/.npm-cache
-          key: js-${{ secrets.GH_CACHE_VERSION }}-${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+          key: js-${{ secrets.GH_CACHE_VERSION }}-${{ runner.os }}-yarn-${{ hashFiles('yarn.lock') }}
           restore-keys: |
             js-${{ secrets.GH_CACHE_VERSION }}-${{ runner.os }}-yarn-
       - name: 'setup-js'
@@ -139,7 +141,7 @@ jobs:
   deploy-pd:
     name: 'deploy PD artifact to S3'
     runs-on: 'ubuntu-18.04'
-    needs: ["js-unit-test", "build-pd"]
+    needs: ['js-unit-test', 'build-pd']
     if: github.event_name != 'pull_request'
     steps:
       - uses: 'actions/checkout@v2'

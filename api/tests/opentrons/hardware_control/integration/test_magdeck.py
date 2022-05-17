@@ -1,5 +1,5 @@
 import asyncio
-from typing import Iterator
+from typing import AsyncIterator, Iterator
 
 import pytest
 from mock import AsyncMock
@@ -10,15 +10,14 @@ from opentrons.hardware_control.modules import MagDeck
 
 @pytest.fixture
 async def magdeck(
-    loop: asyncio.BaseEventLoop,
     emulation_app: Iterator[None],
     emulator_settings: Settings,
-) -> MagDeck:
+) -> AsyncIterator[MagDeck]:
     module = await MagDeck.build(
         port=f"socket://127.0.0.1:{emulator_settings.magdeck_proxy.driver_port}",
         execution_manager=AsyncMock(),
-        usb_port=USBPort(name="", port_number=1, sub_names=[], device_path="", hub=1),
-        loop=loop,
+        usb_port=USBPort(name="", port_number=1, device_path="", hub=1),
+        loop=asyncio.get_running_loop(),
     )
     yield module
     await module.cleanup()

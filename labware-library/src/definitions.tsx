@@ -106,3 +106,15 @@ export function DefinitionRoute(props: DefinitionRouteProps): JSX.Element {
     />
   )
 }
+
+export const NEW_LABWARE_DEFS = [
+  'thermoscientificnunc_96_wellplate_1300ul',
+  'thermoscientificnunc_96_wellplate_2000ul',
+  'appliedbiosystemsmicroamp_384_wellplate_40ul',
+  'biorad_384_wellplate_50ul',
+]
+
+export function isNewLabware(definition: LabwareDefinition): boolean {
+  const { loadName } = definition.parameters
+  return NEW_LABWARE_DEFS.includes(loadName)
+}

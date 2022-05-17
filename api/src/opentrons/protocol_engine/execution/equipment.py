@@ -1,13 +1,29 @@
 """Equipment command side-effect logic."""
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, overload
 
 from opentrons.calibration_storage.helpers import uri_from_details
 from opentrons.protocols.models import LabwareDefinition
 from opentrons.types import MountType
 from opentrons.hardware_control import HardwareControlAPI
-
-from ..errors import FailedToLoadPipetteError, LabwareDefinitionDoesNotExistError
+from opentrons.hardware_control.modules import (
+    AbstractModule,
+    MagDeck,
+    HeaterShaker,
+    TempDeck,
+    Thermocycler,
+)
+from opentrons.protocol_engine.state.module_substates import (
+    MagneticModuleId,
+    HeaterShakerModuleId,
+    TemperatureModuleId,
+    ThermocyclerModuleId,
+)
+from ..errors import (
+    FailedToLoadPipetteError,
+    LabwareDefinitionDoesNotExistError,
+    ModuleNotAttachedError,
+)
 from ..resources import LabwareDataProvider, ModuleDataProvider, ModelUtils
 from ..state import StateStore, HardwareModule
 from ..types import (
@@ -114,9 +130,10 @@ class EquipmentHandler:
             slot_name = location.slotName
             module_model = None
         else:
-            module = self._state_store.modules.get(location.moduleId)
-            slot_name = module.location.slotName
-            module_model = module.model
+            module_id = location.moduleId
+            module_model = self._state_store.modules.get_model(module_id)
+            module_location = self._state_store.modules.get_location(module_id)
+            slot_name = module_location.slotName
 
         offset = self._state_store.labware.find_applicable_labware_offset(
             definition_uri=definition_uri,
@@ -208,7 +225,7 @@ class EquipmentHandler:
                 for hw_mod in self._hardware_api.attached_modules
             ]
 
-            attached_module = self._state_store.modules.find_attached_module(
+            attached_module = self._state_store.modules.select_hardware_module_to_load(
                 model=model,
                 location=location,
                 attached_modules=attached_modules,
@@ -216,9 +233,9 @@ class EquipmentHandler:
 
         else:
             attached_module = HardwareModule(
-                # TODO(mc, 2022-02-14): use something a little more obvious
-                # than an opaque UUID for the virtual serial number
-                serial_number=self._model_utils.generate_id(),
+                serial_number=self._model_utils.generate_id(
+                    prefix="fake-serial-number-"
+                ),
                 definition=self._module_data_provider.get_definition(model),
             )
 
@@ -226,4 +243,49 @@ class EquipmentHandler:
             module_id=self._model_utils.ensure_id(module_id),
             serial_number=attached_module.serial_number,
             definition=attached_module.definition,
+        )
+
+    @overload
+    def get_module_hardware_api(
+        self,
+        module_id: MagneticModuleId,
+    ) -> Optional[MagDeck]:
+        ...
+
+    @overload
+    def get_module_hardware_api(
+        self,
+        module_id: HeaterShakerModuleId,
+    ) -> Optional[HeaterShaker]:
+        ...
+
+    @overload
+    def get_module_hardware_api(
+        self,
+        module_id: TemperatureModuleId,
+    ) -> Optional[TempDeck]:
+        ...
+
+    @overload
+    def get_module_hardware_api(
+        self,
+        module_id: ThermocyclerModuleId,
+    ) -> Optional[Thermocycler]:
+        ...
+
+    def get_module_hardware_api(self, module_id: str) -> Optional[AbstractModule]:
+        """Get the hardware API for a given module."""
+        use_virtual_modules = self._state_store.get_configs().use_virtual_modules
+        if use_virtual_modules:
+            return None
+
+        attached_modules = self._hardware_api.attached_modules
+        serial_number = self._state_store.modules.get_serial_number(module_id)
+        for mod in attached_modules:
+            if mod.device_info["serial"] == serial_number:
+                return mod
+
+        raise ModuleNotAttachedError(
+            f'No module attached with serial number "{serial_number}"'
+            f' for module ID "{module_id}".'
         )

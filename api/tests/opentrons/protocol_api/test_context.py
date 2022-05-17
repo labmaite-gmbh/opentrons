@@ -1,5 +1,6 @@
 """ Test the functions and classes in the protocol context """
 
+import asyncio
 import json
 from unittest import mock
 from typing import Any, Dict
@@ -242,7 +243,7 @@ def test_pick_up_and_drop_tip(ctx, get_labware_def):
 
     instr = ctx.load_instrument("p300_single", mount, tip_racks=[tiprack])
 
-    pipette: Pipette = ctx._implementation.get_hardware()._attached_instruments[mount]
+    pipette: Pipette = ctx._implementation.get_hardware().hardware_instruments[mount]
     nozzle_offset = Point(*pipette.config.nozzle_offset)
     assert pipette.critical_point() == nozzle_offset
     target_location = tiprack["A1"].top()
@@ -259,7 +260,7 @@ def test_pick_up_and_drop_tip(ctx, get_labware_def):
     assert pipette.critical_point() == nozzle_offset
 
 
-def test_return_tip_old_version(loop, hardware, get_labware_def):
+async def test_return_tip_old_version(hardware, get_labware_def):
     # API version 2.2, a returned tip would be picked up by the
     # next pick up tip call
     api_version = APIVersion(2, 1)
@@ -268,7 +269,7 @@ def test_return_tip_old_version(loop, hardware, get_labware_def):
             api_version=api_version,
             sync_hardware=hardware.sync,
         ),
-        loop=loop,
+        loop=asyncio.get_running_loop(),
         api_version=api_version,
     )
     ctx.home()
@@ -280,7 +281,7 @@ def test_return_tip_old_version(loop, hardware, get_labware_def):
     with pytest.raises(TypeError):
         instr.return_tip()
 
-    pipette: Pipette = ctx._implementation.get_hardware()._attached_instruments[mount]
+    pipette: Pipette = ctx._implementation.get_hardware().hardware_instruments[mount]
 
     target_location = tiprack["A1"].top()
     instr.pick_up_tip(target_location)
@@ -306,7 +307,7 @@ def test_return_tip(ctx, get_labware_def):
     with pytest.raises(TypeError):
         instr.return_tip()
 
-    pipette: Pipette = ctx._implementation.get_hardware()._attached_instruments[mount]
+    pipette: Pipette = ctx._implementation.get_hardware().hardware_instruments[mount]
 
     target_location = tiprack["A1"].top()
     instr.pick_up_tip(target_location)
@@ -330,7 +331,7 @@ def test_use_filter_tips(ctx, get_labware_def):
     mount = Mount.LEFT
 
     instr = ctx.load_instrument("p300_single", mount, tip_racks=[tiprack])
-    pipette: Pipette = ctx._implementation.get_hardware()._attached_instruments[mount]
+    pipette: Pipette = ctx._implementation.get_hardware().hardware_instruments[mount]
 
     assert pipette.available_volume == pipette.config.max_volume
 
@@ -356,7 +357,7 @@ def test_pick_up_tip_no_location(ctx, get_labware_def, pipette_model, tiprack_ki
 
     instr = ctx.load_instrument(pipette_model, mount, tip_racks=[tiprack1, tiprack2])
 
-    pipette: Pipette = ctx._implementation.get_hardware()._attached_instruments[mount]
+    pipette: Pipette = ctx._implementation.get_hardware().hardware_instruments[mount]
     nozzle_offset = Point(*pipette.config.nozzle_offset)
     assert pipette.critical_point() == nozzle_offset
 
@@ -453,7 +454,7 @@ def test_aspirate(ctx, get_labware_def):
         ctx._implementation.get_hardware()._obj_to_adapt, "aspirate"
     ) as fake_hw_aspirate:
         hardware = ctx._implementation.get_hardware()
-        hardware._obj_to_adapt._attached_instruments[Mount.RIGHT]._current_volume = 1
+        hardware._obj_to_adapt.hardware_instruments[Mount.RIGHT]._current_volume = 1
 
         instr.aspirate(2.0)
         fake_move.assert_not_called()
@@ -622,14 +623,14 @@ def test_mix(ctx, monkeypatch):
     assert mix_steps == expected_mix_steps
 
 
-def test_touch_tip_default_args(loop, monkeypatch, hardware):
+async def test_touch_tip_default_args(monkeypatch, hardware):
     api_version = APIVersion(2, 3)
     ctx = papi.ProtocolContext(
         implementation=ProtocolContextImplementation(
             api_version=api_version,
             sync_hardware=hardware.sync,
         ),
-        loop=loop,
+        loop=asyncio.get_running_loop(),
         api_version=api_version,
     )
     ctx.home()
@@ -922,7 +923,7 @@ def test_loaded_modules(ctx, monkeypatch):
     assert ctx.loaded_modules[4] == temp2
 
 
-def test_order_of_module_load(loop):
+async def test_order_of_module_load():
     import opentrons.hardware_control as hardware_control
     import opentrons.protocol_api as protocol_api
 
@@ -938,7 +939,7 @@ def test_order_of_module_load(loop):
 
     ctx1 = protocol_api.ProtocolContext(
         implementation=ProtocolContextImplementation(sync_hardware=fake_hardware),
-        loop=loop,
+        loop=asyncio.get_running_loop(),
     )
 
     temp1 = ctx1.load_module("tempdeck", 4)
@@ -955,7 +956,7 @@ def test_order_of_module_load(loop):
     # was loaded into
     ctx2 = protocol_api.ProtocolContext(
         implementation=ProtocolContextImplementation(sync_hardware=fake_hardware),
-        loop=loop,
+        loop=asyncio.get_running_loop(),
     )
 
     ctx2.load_module("thermocycler")
@@ -1014,7 +1015,7 @@ def test_tip_length_for_load_caldata(ctx):
     delete.clear_tip_length_calibration()
 
 
-def test_bundled_labware(loop, get_labware_fixture, hardware):
+async def test_bundled_labware(get_labware_fixture, hardware):
     fixture_96_plate = get_labware_fixture("fixture_96_plate")
     bundled_labware = {"fixture/fixture_96_plate/1": fixture_96_plate}
 
@@ -1022,7 +1023,7 @@ def test_bundled_labware(loop, get_labware_fixture, hardware):
         implementation=ProtocolContextImplementation(
             sync_hardware=hardware.sync, bundled_labware=bundled_labware
         ),
-        loop=loop,
+        loop=asyncio.get_running_loop(),
     )
 
     lw1 = ctx.load_labware("fixture_96_plate", 3, namespace="fixture")
@@ -1030,7 +1031,7 @@ def test_bundled_labware(loop, get_labware_fixture, hardware):
     assert ctx.loaded_labwares[3]._implementation.get_definition() == fixture_96_plate
 
 
-def test_bundled_labware_missing(loop, get_labware_fixture, hardware):
+async def test_bundled_labware_missing(get_labware_fixture, hardware):
     bundled_labware: Dict[str, Any] = {}
     with pytest.raises(
         RuntimeError, match="No labware found in bundle with load name fixture_96_plate"
@@ -1039,7 +1040,7 @@ def test_bundled_labware_missing(loop, get_labware_fixture, hardware):
             implementation=ProtocolContextImplementation(
                 bundled_labware=bundled_labware, sync_hardware=hardware.sync
             ),
-            loop=loop,
+            loop=asyncio.get_running_loop(),
         )
         ctx.load_labware("fixture_96_plate", 3, namespace="fixture")
 
@@ -1054,30 +1055,30 @@ def test_bundled_labware_missing(loop, get_labware_fixture, hardware):
                 extra_labware=bundled_labware,
                 sync_hardware=hardware.sync,
             ),
-            loop=loop,
+            loop=asyncio.get_running_loop(),
         )
         ctx.load_labware("fixture_96_plate", 3, namespace="fixture")
 
 
-def test_bundled_data(loop, hardware):
+async def test_bundled_data(hardware):
     bundled_data = {"foo": b"1,2,3"}
     ctx = papi.ProtocolContext(
         implementation=ProtocolContextImplementation(
             bundled_data=bundled_data, sync_hardware=hardware.sync
         ),
-        loop=loop,
+        loop=asyncio.get_running_loop(),
     )
     assert ctx.bundled_data == bundled_data
 
 
-def test_extra_labware(loop, get_labware_fixture, hardware):
+async def test_extra_labware(get_labware_fixture, hardware):
     fixture_96_plate = get_labware_fixture("fixture_96_plate")
     bundled_labware = {"fixture/fixture_96_plate/1": fixture_96_plate}
     ctx = papi.ProtocolContext(
         implementation=ProtocolContextImplementation(
             extra_labware=bundled_labware, sync_hardware=hardware.sync
         ),
-        loop=loop,
+        loop=asyncio.get_running_loop(),
     )
 
     ls1 = ctx.load_labware("fixture_96_plate", 3, namespace="fixture")
@@ -1085,7 +1086,7 @@ def test_extra_labware(loop, get_labware_fixture, hardware):
     assert ctx.loaded_labwares[3]._implementation.get_definition() == fixture_96_plate
 
 
-def test_api_version_checking(hardware):
+async def test_api_version_checking(hardware):
     minor_over = APIVersion(
         papi.MAX_SUPPORTED_VERSION.major,
         papi.MAX_SUPPORTED_VERSION.minor + 1,
@@ -1107,7 +1108,7 @@ def test_api_version_checking(hardware):
         )
 
 
-def test_api_per_call_checking(monkeypatch, hardware):
+async def test_api_per_call_checking(monkeypatch, hardware):
     implementation = ProtocolContextImplementation(sync_hardware=hardware.sync)
 
     ctx = papi.ProtocolContext(

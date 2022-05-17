@@ -16,9 +16,10 @@ on:
       - 'notify-server/**/*'
       - '.github/workflows/robot-server-test-lint.yaml'
       - '.github/actions/python/**'
-    branches-ignore: # ignore any release-related thing (handled elsewhere)
+    branches:
+      - 'edge'
       - 'release'
-      - 'chore_release-**'
+      - '*hotfix*'
     tags-ignore:
       - '*'
   pull_request:
@@ -41,6 +42,9 @@ jobs:
     name: 'robot server package linting and tests'
     timeout-minutes: 20
     runs-on: 'ubuntu-18.04'
+    strategy:
+      matrix:
+        with-ot-hardware: ['true', 'false']
     steps:
       - uses: 'actions/checkout@v2'
       - uses: 'actions/setup-node@v1'
@@ -53,11 +57,17 @@ jobs:
       - uses: './.github/actions/python/setup'
         with:
           project: 'robot-server'
+      - if: ${{ matrix.with-ot-hardware == 'false' }}
+        name: Remove OT-3 hardware package
+        run: make -C robot-server setup-ot2
       - name: Lint
         run: make -C robot-server lint
       - name: Test
-        run: make -C robot-server test
-      - uses: 'codecov/codecov-action@v2'
+        run: make -C robot-server test-cov
+      - name: Ensure assets build
+        run: make -C robot-server sdist wheel
+      - name: Upload coverage report
+        uses: 'codecov/codecov-action@v2'
         with:
           files: ./robot-server/coverage.xml
           flags: robot-server

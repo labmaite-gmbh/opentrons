@@ -35,7 +35,8 @@ simfile ?=
 # make test tests=tests/opentrons/tools/test_pipette_memory.py would run only the
 # specified test
 tests ?= tests
-test_opts ?=  --cov=src/opentrons --cov-report term-missing:skip-covered --cov-report xml:coverage.xml
+cov_opts ?= --cov=src/opentrons --cov-report term-missing:skip-covered --cov-report xml:coverage.xml
+test_opts ?=
 
 # These variables must be overridden when make deploy or make deploy-staging is run
 # to set the auth details for pypi
@@ -69,11 +70,17 @@ clean_cmd = $(SHX) rm -rf build dist .coverage coverage.xml '*.egg-info' '**/__p
 plot_type ?=
 
 .PHONY: all
-all: clean wheel
+all: clean sdist wheel
 
 .PHONY: setup
 setup:
 	$(pipenv) sync $(pipenv_opts)
+	$(pipenv) run pip freeze
+
+.PHONY: setup-ot2
+setup-ot2:
+	$(pipenv) sync $(pipenv_opts)
+	$(pipenv) run pip uninstall -y opentrons_hardware
 	$(pipenv) run pip freeze
 
 .PHONY: clean
@@ -103,6 +110,14 @@ $(sdist_file): setup.py $(ot_sources)
 .PHONY: test
 test:
 	$(pytest) $(tests) $(test_opts)
+
+.PHONY: test-cov
+test-cov:
+	$(pytest) $(tests) $(test_opts) $(cov_opts)
+
+.PHONY: test-ot2
+test-ot2:
+	$(pytest) $(tests) $(test_opts) --ot2-only --ignore-glob="**/*ot3*"
 
 .PHONY: lint
 lint:

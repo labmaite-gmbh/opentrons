@@ -2,13 +2,16 @@ import * as errorCreators from '../../errorCreators'
 import {
   modulePipetteCollision,
   thermocyclerPipetteCollision,
+  pipetteIntoHeaterShakerLatchOpen,
+  pipetteIntoHeaterShakerWhileShaking,
 } from '../../utils'
-import type { Command } from '@opentrons/shared-data/protocol/types/schemaV5Addendum'
-import type { MoveToWellParams } from '@opentrons/shared-data/protocol/types/schemaV5'
+import type { CreateCommand } from '@opentrons/shared-data'
+import type { MoveToWellParams as v5MoveToWellParams } from '@opentrons/shared-data/protocol/types/schemaV5'
+import type { MoveToWellParams as v6MoveToWellParams } from '@opentrons/shared-data/protocol/types/schemaV6/command/gantry'
 import type { CommandCreator, CommandCreatorError } from '../../types'
 
 /** Move to specified well of labware, with optional offset and pathing options. */
-export const moveToWell: CommandCreator<MoveToWellParams> = (
+export const moveToWell: CommandCreator<v5MoveToWellParams> = (
   args,
   invariantContext,
   prevRobotState
@@ -59,17 +62,48 @@ export const moveToWell: CommandCreator<MoveToWellParams> = (
     errors.push(errorCreators.thermocyclerLidClosed())
   }
 
+  if (
+    pipetteIntoHeaterShakerLatchOpen(
+      prevRobotState.modules,
+      prevRobotState.labware,
+      labware
+    )
+  ) {
+    errors.push(errorCreators.heaterShakerLatchOpen())
+  }
+
+  if (
+    pipetteIntoHeaterShakerWhileShaking(
+      prevRobotState.modules,
+      prevRobotState.labware,
+      labware
+    )
+  ) {
+    errors.push(errorCreators.heaterShakerIsShaking())
+  }
+
   if (errors.length > 0) {
     return {
       errors,
     }
   }
 
-  const params: MoveToWellParams = {
-    pipette,
-    labware,
-    well,
-    offset,
+  const requiredParams: v6MoveToWellParams = {
+    pipetteId: pipette,
+    labwareId: labware,
+    wellName: well,
+  }
+
+  const wellLocationParams: Pick<v6MoveToWellParams, 'wellLocation'> = {
+    wellLocation: {
+      origin: 'bottom',
+      offset,
+    },
+  }
+
+  const params = {
+    ...requiredParams,
+    ...(offset != null && wellLocationParams),
   }
 
   // add optional fields only if specified
@@ -81,9 +115,9 @@ export const moveToWell: CommandCreator<MoveToWellParams> = (
     params.minimumZHeight = minimumZHeight
   }
 
-  const commands: Command[] = [
+  const commands: CreateCommand[] = [
     {
-      command: 'moveToWell',
+      commandType: 'moveToWell',
       params,
     },
   ]

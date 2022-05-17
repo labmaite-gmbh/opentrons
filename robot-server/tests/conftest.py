@@ -14,18 +14,15 @@ from datetime import datetime, timezone
 from fastapi import routing
 from mock import MagicMock
 from starlette.testclient import TestClient
-from typing import Any, Callable, Dict, Iterator, cast
+from typing import Any, Callable, Dict, Generator, Iterator, cast
 from typing_extensions import NoReturn
+from pathlib import Path
+from sqlalchemy.engine import Engine
 
 from opentrons_shared_data.labware.dev_types import LabwareDefinition
 
 from opentrons import config
-from opentrons.hardware_control import (
-    API,
-    HardwareControlAPI,
-    ThreadedAsyncLock,
-    ThreadManagedHardware,
-)
+from opentrons.hardware_control import API, HardwareControlAPI, ThreadedAsyncLock
 from opentrons.protocols.context.protocol_api.labware import LabwareImplementation
 from opentrons.calibration_storage import delete, modify, helpers
 from opentrons.protocol_api import labware
@@ -36,6 +33,7 @@ from robot_server import app
 from robot_server.hardware import get_hardware
 from robot_server.versioning import API_VERSION_HEADER, LATEST_API_VERSION_HEADER_VALUE
 from robot_server.service.session.manager import SessionManager
+from robot_server.persistence import open_db_no_cleanup, add_tables_to_db
 
 test_router = routing.APIRouter()
 
@@ -46,6 +44,24 @@ async def always_raise() -> NoReturn:
 
 
 app.include_router(test_router)
+
+
+@pytest.fixture(autouse=True)
+def configure_test_logs(caplog: pytest.LogCaptureFixture) -> None:
+    """Configure which logs pytest captures and displays.
+
+    Because of the autouse=True, this automatically applies to each test.
+
+    By default, pytest displays log messages of level WARNING and above.
+    If you need to adjust this in the course of a debugging adventure,
+    you should normally do it by passing something like --log-level=DEBUG
+    to pytest on the command line.
+    """
+    # Fix up SQLAlchemy's logging so that it uses the same log level as everything else.
+    # By default, SQLAlchemy's logging is slightly unusual: it hides messages below
+    # WARNING, even if you pass --log-level=DEBUG to pytest on the command line.
+    # See: https://docs.sqlalchemy.org/en/14/core/engines.html#configuring-logging
+    caplog.set_level("NOTSET", logger="sqlalchemy")
 
 
 @pytest.fixture
@@ -72,12 +88,14 @@ def hardware() -> MagicMock:
 
 
 @pytest.fixture
-def override_hardware(hardware: MagicMock) -> None:
+def override_hardware(hardware: MagicMock) -> Iterator[None]:
     async def get_hardware_override() -> HardwareControlAPI:
         """Override for get_hardware dependency"""
         return hardware
 
     app.dependency_overrides[get_hardware] = get_hardware_override
+    yield
+    del app.dependency_overrides[get_hardware]
 
 
 @pytest.fixture
@@ -144,8 +162,11 @@ def run_server(
             "OT_ROBOT_SERVER_DOT_ENV_PATH": "dev.env",
             "OT_API_CONFIG_DIR": server_temp_directory,
         },
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        stdin=subprocess.DEVNULL,
+        # The server will log to its stdout or stderr.
+        # Let it inherit our stdout and stderr so pytest captures its logs.
+        stdout=None,
+        stderr=None,
     ) as proc:
         # Wait for a bit to get started by polling /health
         from requests.exceptions import ConnectionError
@@ -235,7 +256,7 @@ def set_up_deck_calibration_temp_directory(server_temp_directory: str) -> None:
 
 
 @pytest.fixture
-def session_manager(hardware: ThreadManagedHardware) -> SessionManager:
+def session_manager(hardware: HardwareControlAPI) -> SessionManager:
     return SessionManager(
         hardware=hardware,
         motion_lock=ThreadedAsyncLock(),
@@ -383,3 +404,15 @@ def clear_custom_tiprack_def_dir() -> Iterator[None]:
         os.remove(tiprack_path)
     except FileNotFoundError:
         pass
+
+
+@pytest.fixture
+def sql_engine(tmp_path: Path) -> Generator[Engine, None, None]:
+    """Return a set-up database to back the store."""
+    db_file_path = tmp_path / "test.db"
+    sql_engine = open_db_no_cleanup(db_file_path=db_file_path)
+    try:
+        add_tables_to_db(sql_engine)
+        yield sql_engine
+    finally:
+        sql_engine.dispose()

@@ -7,9 +7,11 @@ import {
   TEMPERATURE_MODULE_V1,
   TEMPERATURE_MODULE_V2,
   THERMOCYCLER_MODULE_V1,
+  HEATERSHAKER_MODULE_V1,
   MAGNETIC_MODULE_TYPE,
   TEMPERATURE_MODULE_TYPE,
   THERMOCYCLER_MODULE_TYPE,
+  HEATERSHAKER_MODULE_TYPE,
   GEN1,
   GEN2,
   LEFT,
@@ -167,6 +169,7 @@ export type ModuleType =
   | typeof MAGNETIC_MODULE_TYPE
   | typeof TEMPERATURE_MODULE_TYPE
   | typeof THERMOCYCLER_MODULE_TYPE
+  | typeof HEATERSHAKER_MODULE_TYPE
 
 // ModuleModel corresponds to top-level keys in shared-data/module/definitions/2
 export type MagneticModuleModel =
@@ -179,10 +182,13 @@ export type TemperatureModuleModel =
 
 export type ThermocyclerModuleModel = typeof THERMOCYCLER_MODULE_V1
 
+export type HeaterShakerModuleModel = typeof HEATERSHAKER_MODULE_V1
+
 export type ModuleModel =
   | MagneticModuleModel
   | TemperatureModuleModel
   | ThermocyclerModuleModel
+  | HeaterShakerModuleModel
 
 export type ModuleModelWithLegacy =
   | ModuleModel
@@ -371,6 +377,10 @@ export interface PendingProtocolAnalysis {
   id: string
   status?: 'pending'
 }
+export interface ProtocolAnalysisSummary {
+  id: string
+  status: 'pending' | 'completed'
+}
 export interface LoadedPipette {
   id: string
   pipetteName: PipetteName
@@ -410,10 +420,20 @@ export interface ProtocolResource {
   createdAt: string
   protocolType: 'json' | 'python'
   metadata: ProtocolMetadata
-  analyses: Array<PendingProtocolAnalysis | CompletedProtocolAnalysis>
+  analysisSummaries: ProtocolAnalysisSummary[]
   files: ResourceFile[]
+}
+
+export interface ProtocolAnalysesResource {
+  analyses: Array<PendingProtocolAnalysis | CompletedProtocolAnalysis>
 }
 
 export type MotorAxis = Array<
   'x' | 'y' | 'leftZ' | 'rightZ' | 'leftPlunger' | 'rightPlunger'
 >
+
+export type ThermalAdapterName =
+  | 'PCR Adapter'
+  | 'Deep Well Adapter'
+  | '96 Flat Bottom Adapter'
+  | 'Universal Flat Adapter'

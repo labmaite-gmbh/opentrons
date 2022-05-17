@@ -210,7 +210,9 @@ class ProtocolContext:
         elif result.definition.moduleType == ModuleType.TEMPERATURE:
             return TemperatureModuleContext(module_id=result.moduleId)
         elif result.definition.moduleType == ModuleType.THERMOCYCLER:
-            return ThermocyclerModuleContext(module_id=result.moduleId)
+            return ThermocyclerModuleContext(
+                engine_client=self._engine_client, module_id=result.moduleId
+            )
         else:
             assert False, "Unsupported module definition"
 
@@ -224,6 +226,14 @@ class ProtocolContext:
                 will be available to the app or client controlling the protocol.
         """
         self._engine_client.pause(message=msg)
+
+    def set_rail_lights(self, on: bool) -> None:
+        """Controls the robot rail lights.
+
+        Args:
+            on: If true, turn on rail lights; otherwise, turn off.
+        """
+        self._engine_client.set_rail_lights(on=on)
 
     # todo(mm, 2021-04-09): Add all other public methods from the APIv2
     # ProtocolContext.

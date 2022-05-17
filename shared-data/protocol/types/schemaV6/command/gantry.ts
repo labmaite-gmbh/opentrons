@@ -1,7 +1,7 @@
-import type { CommonCommandRunTimeInfo } from '.'
-import type { MotorAxis } from '../../../../js/types'
+import type { CommonCommandRunTimeInfo, CommonCommandCreateInfo } from '.'
+import type { Coordinates, MotorAxis } from '../../../../js/types'
 
-export interface MoveToSlotCreateCommand {
+export interface MoveToSlotCreateCommand extends CommonCommandCreateInfo {
   commandType: 'moveToSlot'
   params: MoveToSlotParams
 }
@@ -10,7 +10,7 @@ export interface MoveToSlotRunTimeCommand
     MoveToSlotCreateCommand {
   result: {}
 }
-export interface MoveToWellCreateCommand {
+export interface MoveToWellCreateCommand extends CommonCommandCreateInfo {
   commandType: 'moveToWell'
   params: MoveToWellParams
 }
@@ -19,7 +19,8 @@ export interface MoveToWellRunTimeCommand
     MoveToWellCreateCommand {
   result: {}
 }
-export interface MoveToCoordinatesCreateCommand {
+export interface MoveToCoordinatesCreateCommand
+  extends CommonCommandCreateInfo {
   commandType: 'moveToCoordinates'
   params: MoveToCoordinatesParams
 }
@@ -28,25 +29,30 @@ export interface MoveToCoordinatesRunTimeCommand
     MoveToCoordinatesCreateCommand {
   result: {}
 }
-export interface MoveRelativeCreateCommand {
+export interface MoveRelativeCreateCommand extends CommonCommandCreateInfo {
   commandType: 'moveRelative'
   params: MoveRelativeParams
 }
 export interface MoveRelativeRunTimeCommand
   extends CommonCommandRunTimeInfo,
     MoveRelativeCreateCommand {
-  result: {}
+  result: {
+    position: Coordinates
+  }
 }
-export interface SavePositionCreateCommand {
+export interface SavePositionCreateCommand extends CommonCommandCreateInfo {
   commandType: 'savePosition'
   params: SavePositionParams
 }
 export interface SavePositionRunTimeCommand
   extends CommonCommandRunTimeInfo,
     SavePositionCreateCommand {
-  result: {}
+  result: {
+    positionId: string
+    position: Coordinates
+  }
 }
-export interface HomeCreateCommand {
+export interface HomeCreateCommand extends CommonCommandCreateInfo {
   commandType: 'home'
   params: HomeParams
 }
@@ -82,16 +88,16 @@ interface MoveToSlotParams {
   forceDirect?: boolean
 }
 
-interface MoveToWellParams {
+export interface MoveToWellParams {
   pipetteId: string
   labwareId: string
   wellName: string
-  wellLocation: {
-    origin: 'top' | 'bottom'
+  wellLocation?: {
+    origin?: 'top' | 'bottom'
     offset?: {
-      x: number
-      y: number
-      z: number
+      x?: number
+      y?: number
+      z?: number
     }
   }
   minimumZHeight?: number

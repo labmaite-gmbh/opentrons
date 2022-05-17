@@ -1,4 +1,5 @@
 import {
+  HEATERSHAKER_MODULE_TYPE,
   TEMPERATURE_MODULE_TYPE,
   THERMOCYCLER_MODULE_TYPE,
 } from '@opentrons/shared-data'
@@ -6,6 +7,7 @@ import * as errorCreators from '../../errorCreators'
 import type { CommandCreator, SetTemperatureArgs } from '../../types'
 
 /** Set temperature target for specified module. */
+// @ts-expect-error TODO: remove this after https://github.com/Opentrons/opentrons/pull/10182 merges
 export const setTemperature: CommandCreator<SetTemperatureArgs> = (
   args,
   invariantContext,
@@ -20,17 +22,16 @@ export const setTemperature: CommandCreator<SetTemperatureArgs> = (
   }
 
   const moduleType = invariantContext.moduleEntities[module]?.type
-  const params = {
-    module,
-    temperature: targetTemperature,
-  }
 
   if (moduleType === TEMPERATURE_MODULE_TYPE) {
     return {
       commands: [
         {
-          command: 'temperatureModule/setTargetTemperature',
-          params,
+          commandType: 'temperatureModule/setTargetTemperature',
+          params: {
+            moduleId: module,
+            celsius: targetTemperature,
+          },
         },
       ],
     }
@@ -40,9 +41,21 @@ export const setTemperature: CommandCreator<SetTemperatureArgs> = (
     return {
       commands: [],
     }
+  } else if (moduleType === HEATERSHAKER_MODULE_TYPE) {
+    return {
+      commands: [
+        {
+          commandType: 'heaterShakerModule/startSetTargetTemperature',
+          params: {
+            moduleId: module,
+            temperature: targetTemperature,
+          },
+        },
+      ],
+    }
   } else {
     console.error(
-      `setTemperature expected module ${module} to be ${TEMPERATURE_MODULE_TYPE} or ${THERMOCYCLER_MODULE_TYPE}, got ${moduleType}`
+      `setTemperature expected module ${module} to be ${TEMPERATURE_MODULE_TYPE}, ${THERMOCYCLER_MODULE_TYPE} or ${HEATERSHAKER_MODULE_TYPE}, got ${moduleType}`
     )
     // NOTE: "missing module" isn't exactly the right error here, but better than a whitescreen!
     // This should never be shown.

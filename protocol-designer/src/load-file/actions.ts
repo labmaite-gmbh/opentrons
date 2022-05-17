@@ -62,8 +62,7 @@ export const loadProtocolFile = (
       try {
         parsedProtocol = JSON.parse((result as any) as string)
         // TODO LATER Ian 2018-05-18 validate file with JSON Schema here
-        // @ts-expect-error need null checking
-        dispatch(loadFileAction(parsedProtocol))
+        parsedProtocol && dispatch(loadFileAction(parsedProtocol))
       } catch (error) {
         console.error(error)
         fileError('INVALID_JSON_FILE', error.message)

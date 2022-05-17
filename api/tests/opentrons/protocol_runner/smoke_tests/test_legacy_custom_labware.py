@@ -3,16 +3,16 @@
 Legacy ProtocolContext objects are prohibitively difficult to instansiate
 and mock in an isolated unit test environment.
 """
-import io
 import pytest
 import textwrap
 from decoy import matchers
+from pathlib import Path
 from typing import List
 
 from opentrons_shared_data import load_shared_data
 from opentrons.types import DeckSlotName
 from opentrons.protocol_engine import DeckSlotLocation, LoadedLabware
-from opentrons.protocol_reader import ProtocolReader, InputFile
+from opentrons.protocol_reader import ProtocolReader
 from opentrons.protocol_runner import create_simulating_runner
 
 
@@ -29,29 +29,27 @@ CUSTOM_LABWARE_PROTOCOL = textwrap.dedent(
             location="1",
         )
     """
-).encode()
+)
 
 
-@pytest.fixture
-def custom_labware_protocol_files() -> List[InputFile]:
+@pytest.fixture()
+def custom_labware_protocol_files(tmp_path: Path) -> List[Path]:
     """Create input files to feed into the ProtocolReader."""
-    return [
-        InputFile(
-            filename="protocol-name.py",
-            file=io.BytesIO(CUSTOM_LABWARE_PROTOCOL),
-        ),
-        InputFile(filename="labware.json", file=io.BytesIO(FIXTURE_LABWARE_DEF)),
-    ]
+    protocol_path = tmp_path / "protocol-name.py"
+    protocol_path.write_text(CUSTOM_LABWARE_PROTOCOL)
+
+    labware_path = tmp_path / "labware.json"
+    labware_path.write_bytes(FIXTURE_LABWARE_DEF)
+
+    return [protocol_path, labware_path]
 
 
-async def test_legacy_custom_labware(
-    protocol_reader: ProtocolReader,
-    custom_labware_protocol_files: List[InputFile],
-) -> None:
+async def test_legacy_custom_labware(custom_labware_protocol_files: List[Path]) -> None:
     """It should map legacy pick up tip commands."""
-    protocol_source = await protocol_reader.read(
-        name="test_protocol",
+    protocol_reader = ProtocolReader()
+    protocol_source = await protocol_reader.read_saved(
         files=custom_labware_protocol_files,
+        directory=None,
     )
 
     subject = await create_simulating_runner()
@@ -65,5 +63,5 @@ async def test_legacy_custom_labware(
         offsetId=None,
     )
 
-    assert result.errors == []
-    assert expected_labware in result.labware
+    assert result.state_summary.errors == []
+    assert expected_labware in result.state_summary.labware

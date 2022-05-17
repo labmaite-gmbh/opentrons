@@ -400,12 +400,15 @@ export function generateSubstepItem(
     }
   }
 
-  if (stepArgs.commandCreatorFnName === 'awaitTemperature') {
+  if (stepArgs.commandCreatorFnName === 'waitForTemperature') {
+    const moduleId = stepArgs.module
+    const { type } = invariantContext.moduleEntities[moduleId as string]
     return {
-      substepType: 'awaitTemperature',
+      substepType: 'waitForTemperature',
       temperature: stepArgs.temperature,
       labwareNickname: labwareNames?.nickname,
       message: stepArgs.message,
+      moduleType: type,
     }
   }
 
@@ -442,6 +445,18 @@ export function generateSubstepItem(
       lidTargetTemp: stepArgs.lidTargetTemp,
       lidOpen: stepArgs.lidOpen,
       message: stepArgs.message,
+    }
+  }
+
+  if (stepArgs.commandCreatorFnName === 'heaterShaker') {
+    return {
+      substepType: 'heaterShaker',
+      labwareNickname: labwareNames?.nickname,
+      targetSpeed: stepArgs.rpm,
+      targetHeaterShakerTemperature: stepArgs.targetTemperature,
+      latchOpen: stepArgs.latchOpen,
+      heaterShakerTimerMinutes: stepArgs.timerMinutes,
+      heaterShakerTimerSeconds: stepArgs.timerSeconds,
     }
   }
 

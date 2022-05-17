@@ -1,22 +1,25 @@
 import * as React from 'react'
 import { i18n } from '../../../../i18n'
+import {
+  useCreateCommandMutation,
+  useCreateLiveCommandMutation,
+} from '@opentrons/react-api-client'
 import { fireEvent } from '@testing-library/react'
 import { renderWithProviders } from '@opentrons/components'
-import { InputField } from '@opentrons/components/src/forms/InputField'
-import {
-  TEMPERATURE_MODULE_V1,
-  TEMPERATURE_MODULE_V2,
-} from '@opentrons/shared-data'
-import { useSendModuleCommand } from '../../../../redux/modules'
 import { TemperatureModuleSlideout } from '../TemperatureModuleSlideout'
+import {
+  mockTemperatureModule,
+  mockTemperatureModuleGen2,
+} from '../../../../redux/modules/__fixtures__'
 
-jest.mock('../../../../redux/modules')
-jest.mock('@opentrons/components/src/forms/InputField')
+jest.mock('@opentrons/react-api-client')
 
-const mockUseSendModuleCommand = useSendModuleCommand as jest.MockedFunction<
-  typeof useSendModuleCommand
+const mockUseLiveCommandMutation = useCreateLiveCommandMutation as jest.MockedFunction<
+  typeof useCreateLiveCommandMutation
 >
-const mockInputField = InputField as jest.MockedFunction<typeof InputField>
+const mockUseCommandMutation = useCreateCommandMutation as jest.MockedFunction<
+  typeof useCreateCommandMutation
+>
 
 const render = (
   props: React.ComponentProps<typeof TemperatureModuleSlideout>
@@ -26,18 +29,28 @@ const render = (
   })[0]
 }
 
-const SERIAL = 'SERIAL'
 describe('TemperatureModuleSlideout', () => {
   let props: React.ComponentProps<typeof TemperatureModuleSlideout>
+  let mockCreateLiveCommand = jest.fn()
+  let mockCreateCommand = jest.fn()
+
   beforeEach(() => {
+    mockCreateLiveCommand = jest.fn()
+    mockCreateLiveCommand.mockResolvedValue(null)
+
+    mockCreateCommand = jest.fn()
+    mockCreateCommand.mockResolvedValue(null)
     props = {
-      model: TEMPERATURE_MODULE_V1,
+      module: mockTemperatureModule,
       isExpanded: true,
-      serial: SERIAL,
       onCloseClick: jest.fn(),
     }
-    mockInputField.mockReturnValue(<div></div>)
-    mockUseSendModuleCommand.mockReturnValue(jest.fn())
+    mockUseLiveCommandMutation.mockReturnValue({
+      createLiveCommand: mockCreateLiveCommand,
+    } as any)
+    mockUseCommandMutation.mockReturnValue({
+      createCommand: mockCreateCommand,
+    } as any)
   })
   afterEach(() => {
     jest.resetAllMocks()
@@ -50,13 +63,12 @@ describe('TemperatureModuleSlideout', () => {
     getByText(
       'Pre heat or cool your Temperature Module GEN1. Enter a whole number between 4 °C and 96 °C.'
     )
-    getByText('Temperature')
+    getByText('Set temperature')
   })
 
   it('renders correct title and body for a gen2 temperature module', () => {
     props = {
-      model: TEMPERATURE_MODULE_V2,
-      serial: SERIAL,
+      module: mockTemperatureModuleGen2,
       isExpanded: true,
       onCloseClick: jest.fn(),
     }
@@ -66,20 +78,58 @@ describe('TemperatureModuleSlideout', () => {
     getByText(
       'Pre heat or cool your Temperature Module GEN2. Enter a whole number between 4 °C and 96 °C.'
     )
-    getByText('Temperature')
+    getByText('Set temperature')
   })
 
   it('renders the button and it is not clickable until there is something in form field', () => {
-    const { getByRole } = render(props)
-    const button = getByRole('button', { name: 'Set Temperature' })
-    expect(button).not.toBeEnabled()
-    mockInputField.mockReturnValue(<div>6 C</div>)
-    mockUseSendModuleCommand.mockReturnValue({
-      moduleId: SERIAL,
-      command: 'set_temperature',
-      args: 6,
-    } as any)
+    props = {
+      module: mockTemperatureModuleGen2,
+      isExpanded: true,
+      onCloseClick: jest.fn(),
+    }
+    const { getByRole, getByTestId } = render(props)
+    const button = getByRole('button', { name: 'Confirm' })
+    const input = getByTestId('temperatureModuleV2')
+    fireEvent.change(input, { target: { value: '20' } })
+    expect(button).toBeEnabled()
     fireEvent.click(button)
+
+    expect(mockCreateLiveCommand).toHaveBeenCalledWith({
+      command: {
+        commandType: 'temperatureModule/setTargetTemperature',
+        params: {
+          moduleId: mockTemperatureModule.id,
+          celsius: 20,
+        },
+      },
+    })
+    expect(button).not.toBeEnabled()
+  })
+
+  it('renders the button and it is not clickable until there is something in form field and a run id is present', () => {
+    props = {
+      module: mockTemperatureModuleGen2,
+      isExpanded: true,
+      onCloseClick: jest.fn(),
+      runId: 'test123',
+    }
+    const { getByRole, getByTestId } = render(props)
+    const button = getByRole('button', { name: 'Confirm' })
+    const input = getByTestId('temperatureModuleV2')
+    fireEvent.change(input, { target: { value: '20' } })
+    expect(button).toBeEnabled()
+    fireEvent.click(button)
+
+    expect(mockCreateCommand).toHaveBeenCalledWith({
+      runId: props.runId,
+      command: {
+        commandType: 'temperatureModule/setTargetTemperature',
+        params: {
+          moduleId: mockTemperatureModule.id,
+          celsius: 20,
+        },
+      },
+    })
     expect(button).not.toBeEnabled()
   })
 })

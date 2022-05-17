@@ -7,8 +7,8 @@ from typing import Optional
 
 from can import Notifier, Bus, AsyncBufferedReader, Message
 
-from opentrons_ot3_firmware.arbitration_id import ArbitrationId
-from opentrons_ot3_firmware.message import CanMessage
+from opentrons_hardware.firmware_bindings.arbitration_id import ArbitrationId
+from opentrons_hardware.firmware_bindings.message import CanMessage
 from .errors import ErrorFrameCanError
 from .abstract_driver import AbstractCanDriver
 
@@ -92,6 +92,7 @@ class CanDriver(AbstractCanDriver):
     def shutdown(self) -> None:
         """Stop the driver."""
         self._notifier.stop()
+        self._bus.shutdown()
 
     async def send(self, message: CanMessage) -> None:
         """Send a can message.

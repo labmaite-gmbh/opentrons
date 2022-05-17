@@ -2,8 +2,10 @@ import * as errorCreators from '../../errorCreators'
 import {
   modulePipetteCollision,
   thermocyclerPipetteCollision,
+  pipetteIntoHeaterShakerLatchOpen,
+  pipetteIntoHeaterShakerWhileShaking,
 } from '../../utils'
-import type { Command } from '@opentrons/shared-data/protocol/types/schemaV5Addendum'
+import type { CreateCommand } from '@opentrons/shared-data'
 import type { DispenseParams } from '@opentrons/shared-data/protocol/types/schemaV3'
 import type { CommandCreator, CommandCreatorError } from '../../types'
 
@@ -58,21 +60,46 @@ export const dispense: CommandCreator<DispenseParams> = (
     errors.push(errorCreators.thermocyclerLidClosed())
   }
 
+  if (
+    pipetteIntoHeaterShakerLatchOpen(
+      prevRobotState.modules,
+      prevRobotState.labware,
+      labware
+    )
+  ) {
+    errors.push(errorCreators.heaterShakerLatchOpen())
+  }
+
+  if (
+    pipetteIntoHeaterShakerWhileShaking(
+      prevRobotState.modules,
+      prevRobotState.labware,
+      labware
+    )
+  ) {
+    errors.push(errorCreators.heaterShakerIsShaking())
+  }
+
   if (errors.length > 0) {
     return {
       errors,
     }
   }
 
-  const commands: Command[] = [
+  const commands: CreateCommand[] = [
     {
-      command: 'dispense',
+      commandType: 'dispense',
       params: {
-        pipette,
+        pipetteId: pipette,
         volume,
-        labware,
-        well,
-        offsetFromBottomMm,
+        labwareId: labware,
+        wellName: well,
+        wellLocation: {
+          origin: 'bottom',
+          offset: {
+            z: offsetFromBottomMm,
+          },
+        },
         flowRate,
       },
     },

@@ -8,22 +8,13 @@ import { migrateFile as migrateFileFour } from './4_0_0'
 import { migrateFile as migrateFileFive } from './5_0_0'
 import { migrateFile as migrateFileFiveOne } from './5_1_0'
 import { migrateFile as migrateFileFiveTwo } from './5_2_0'
+import { migrateFile as migrateFileSix } from './6_0_0'
 export const OLDEST_MIGRATEABLE_VERSION = '1.0.0'
 type Version = string
 type MigrationsByVersion = Record<
   Version,
   (arg0: Record<string, any>) => Record<string, any>
 >
-const allMigrationsByVersion: MigrationsByVersion = {
-  // @ts-expect-error file types are incompatible
-  '1.1.0': migrateFileOne,
-  // @ts-expect-error file types are incompatible
-  '3.0.0': migrateFileThree,
-  '4.0.0': migrateFileFour,
-  '5.0.0': migrateFileFive,
-  '5.1.0': migrateFileFiveOne,
-  '5.2.0': migrateFileFiveTwo,
-}
 // get all versions to migrate newer than the file's applicationVersion
 export const getMigrationVersionsToRunFromVersion = (
   migrationsByVersion: {},
@@ -33,6 +24,19 @@ export const getMigrationVersionsToRunFromVersion = (
     semver.compare
   )
   return takeRightWhile(allSortedVersions, v => semver.gt(v, version))
+}
+
+const allMigrationsByVersion: MigrationsByVersion = {
+  // @ts-expect-error file types are incompatible
+  '1.1.0': migrateFileOne,
+  // @ts-expect-error file types are incompatible
+  '3.0.0': migrateFileThree,
+  '4.0.0': migrateFileFour,
+  '5.0.0': migrateFileFive,
+  '5.1.0': migrateFileFiveOne,
+  '5.2.0': migrateFileFiveTwo,
+  // @ts-expect-error fix MigrationsByVersion type (and the function signatures of the older migration functions above)
+  '6.0.0': migrateFileSix,
 }
 export const migration = (
   file: any

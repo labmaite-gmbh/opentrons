@@ -80,15 +80,17 @@ export type StepType =
   | 'magnet'
   | 'temperature'
   | 'thermocycler'
+  | 'heaterShaker'
 export const stepIconsByType: Record<StepType, IconName> = {
   moveLiquid: 'ot-transfer',
   mix: 'ot-mix',
   pause: 'pause',
   manualIntervention: 'pause',
   // TODO Ian 2018-12-13 pause icon for this is a placeholder
-  magnet: 'ot-magnet',
-  temperature: 'ot-temperature',
+  magnet: 'ot-magnet-v2',
+  temperature: 'ot-temperature-v2',
   thermocycler: 'ot-thermocycler',
+  heaterShaker: 'ot-heater-shaker',
 }
 // ===== Unprocessed form types =====
 export interface AnnotationFields {
@@ -251,6 +253,20 @@ export interface HydratedTemperatureFormData {
   moduleId: string | null
   setTemperature: 'true' | 'false'
   targetTemperature: string | null
+}
+export interface HydratedHeaterShakerFormData {
+  id: string
+  stepType: 'heaterShaker'
+  stepDetails: string | null
+  moduleId: string
+  heaterShakerSetTimer: 'true' | 'false' | null
+  setHeaterShakerTemperature: boolean
+  setShake: boolean
+  latchOpen: boolean
+  targetHeaterShakerTemperature: string | null
+  targetSpeed: string | null
+  heaterShakerTimerMinutes: string | null
+  heaterShakerTimerSeconds: string | null
 }
 // TODO: Ian 2019-01-17 Moving away from this and towards nesting all form fields
 // inside `fields` key, but deprecating transfer/consolidate/distribute is a pre-req

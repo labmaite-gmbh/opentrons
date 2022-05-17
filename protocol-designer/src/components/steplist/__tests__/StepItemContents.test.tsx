@@ -1,6 +1,9 @@
 import React from 'react'
 import { shallow } from 'enzyme'
-import { THERMOCYCLER_MODULE_TYPE } from '@opentrons/shared-data'
+import {
+  TEMPERATURE_MODULE_TYPE,
+  THERMOCYCLER_MODULE_TYPE,
+} from '@opentrons/shared-data'
 import { THERMOCYCLER_STATE } from '../../../constants'
 import { StepItemContents, StepItemContentsProps } from '../StepItem'
 import { ModuleStepItems } from '../ModuleStepItems'
@@ -119,11 +122,11 @@ describe('StepItemContents', () => {
     })
   })
 
-  describe('awaitTemperature step type', () => {
-    let awaitTemperatureProps: StepItemContentsProps
+  describe('waitForTemperature step type', () => {
+    let waitForTemperatureProps: StepItemContentsProps
     const stepType: 'temperature' = 'temperature'
     beforeEach(() => {
-      awaitTemperatureProps = {
+      waitForTemperatureProps = {
         ...props,
         rawForm: {
           stepType,
@@ -139,14 +142,15 @@ describe('StepItemContents', () => {
     })
 
     it('module is rendered with temperature and only labware nick name', () => {
-      awaitTemperatureProps.substeps = {
-        substepType: 'awaitTemperature',
+      waitForTemperatureProps.substeps = {
+        substepType: 'waitForTemperature',
         temperature: 45,
         labwareNickname: 'temperature nickname',
         message: 'message',
+        moduleType: TEMPERATURE_MODULE_TYPE,
       }
       // @ts-expect-error(sa, 2021-6-21): StepItemContents might return a list of JSX Elements
-      const wrapper = shallow(<StepItemContents {...awaitTemperatureProps} />)
+      const wrapper = shallow(<StepItemContents {...waitForTemperatureProps} />)
       const component = wrapper.find(ModuleStepItems)
       expect(component).toHaveLength(1)
       expect(component.prop('action')).toEqual('pause until')

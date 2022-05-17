@@ -77,6 +77,7 @@ export interface LayoutProps {
   overflowX?: CSSProperties['overflowX']
   overflowY?: CSSProperties['overflowY']
   wordSpacing?: string | number
+  cursor?: CSSProperties['cursor']
 }
 
 export interface PositionProps {
@@ -86,6 +87,8 @@ export interface PositionProps {
   right?: string | number
   bottom?: string | number
   left?: string | number
+  transform?: string
+  transformOrigin?: CSSProperties['transformOrigin']
 }
 
 export interface TransitionProps {

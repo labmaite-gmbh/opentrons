@@ -14,6 +14,7 @@ import type { StyleProps } from '@opentrons/components'
 
 export interface ToggleBtnProps extends StyleProps {
   label: string
+  id?: string
   toggledOn: boolean
   disabled?: boolean | null
   onClick?: (e: React.MouseEvent) => unknown
@@ -21,7 +22,7 @@ export interface ToggleBtnProps extends StyleProps {
 
 export function ToggleBtn(props: ToggleBtnProps): JSX.Element {
   const { label, toggledOn, disabled, ...buttonProps } = props
-  const iconName = toggledOn ? 'ot-toggle-switch-on' : 'ot-toggle-switch-off'
+  const iconName = toggledOn ? 'ot-toggle-input-on' : 'ot-toggle-input-off'
   let color = C_DARK_GRAY
 
   if (disabled) {
@@ -32,15 +33,14 @@ export function ToggleBtn(props: ToggleBtnProps): JSX.Element {
 
   return (
     <Btn
-      // @ts-expect-error TODO: cast disabled to Boolean as Btn expects it
-      disabled={disabled}
+      disabled={disabled ?? false}
       role="switch"
       aria-label={label}
       aria-checked={toggledOn}
       color={color}
       {...buttonProps}
     >
-      <Icon name={iconName} />
+      <Icon name={iconName} height="0.875rem" />
     </Btn>
   )
 }

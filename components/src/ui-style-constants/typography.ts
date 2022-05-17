@@ -1,14 +1,14 @@
 import { css } from 'styled-components'
-// import type { FlattenSimpleInterpolation } from 'styled-components'
+import { COLORS } from './'
 
 // Font Sizes
-export const fontSizeH1 = '1.125rem' // 18px
+export const fontSizeH1 = '1.188rem' // 19px
 export const fontSizeH2 = '0.9375rem' // 15px
 export const fontSizeH3 = '0.875rem' // 14px
 export const fontSizeH4 = '0.813rem' //  13px
-export const fontSizeH6 = '0.625rem' // 10px
-export const fontSizeP = '0.6875rem' // 11px
-export const fontSizeLabel = '0.75rem' // 12px
+export const fontSizeH6 = '0.563rem' // 9px
+export const fontSizeP = '0.8125rem' // 13px
+export const fontSizeLabel = '0.6875rem' // 11px
 // this is redundant but we need this for captions and it makes more sense to call it caption rather than re-using fsh6
 export const fontSizeCaption = '0.625rem' // 10px
 
@@ -40,26 +40,10 @@ export const textAlignRight = 'right'
 export const textAlignCenter = 'center'
 export const textAlignJustify = 'justify'
 
-//  Overflow menu constants
-export const borderRadiusS = '4px 4px 0px 0px'
-export const boxShadowS = '0px 1px 3px rgba(0, 0, 0, 0.2)'
+// text decoration
+export const textDecorationUnderline = 'underline'
 
-//  Slideout constants
-export const boxShadowM = '0px 3px 6px rgba(0, 0, 0, 0.23)'
-export const boxShadowSM = '0px 1px 3px rgba(0, 0, 0, 0.3)'
-//  Overflow menu btn width
-export const overflowMenuWidth = '9.562rem'
-
-//  Banner component styling
-export const bannerButtonTopMargin = '2.75rem'
-
-//  Heater Shaker Wizard styling
-export const introMarginLeft = '6.063rem' //  97px
-export const introImageWidth = '6.25rem' // 100px
-export const introImageHeight = '4.313rem' // 69px
-export const introBoxWidth = '21.5rem' // 344px
-
-// Default font styles, color agnositic for first pass
+// Default font styles, color agnostic for first pass
 export const h1Default = css`
   font-size: ${fontSizeH1};
   font-weight: ${fontWeightSemiBold};
@@ -93,18 +77,25 @@ export const h6Default = css`
   font-size: ${fontSizeH6};
   font-weight: ${fontWeightRegular};
   line-height: ${lineHeight12};
+  text-transform: ${textTransformUppercase};
+`
+
+export const h6SemiBold = css`
+  font-size: ${fontSizeH6};
+  font-weight: ${fontWeightSemiBold};
+  line-height: ${lineHeight12};
 `
 
 export const pRegular = css`
   font-size: ${fontSizeP};
   font-weight: ${fontWeightRegular};
-  line-height: ${lineHeight16};
+  line-height: ${lineHeight20};
 `
 
 export const pSemiBold = css`
   font-size: ${fontSizeP};
   font-weight: ${fontWeightSemiBold};
-  line-height: ${lineHeight16};
+  line-height: ${lineHeight20};
 `
 
 export const labelRegular = css`
@@ -117,4 +108,15 @@ export const labelSemiBold = css`
   font-size: ${fontSizeLabel};
   font-weight: ${fontWeightSemiBold};
   line-height: ${lineHeight12};
+`
+
+export const linkPSemiBold = css`
+  font-size: ${fontSizeP};
+  font-weight: ${fontWeightSemiBold};
+  line-height: ${lineHeight20};
+  color: ${COLORS.blue};
+
+  &:hover {
+    opacity: 70%;
+  }
 `

@@ -5,23 +5,22 @@ import {
   LinkProps,
   Icon,
   TYPOGRAPHY,
-  COLORS,
   SPACING,
+  Flex,
+  ALIGN_CENTER,
 } from '@opentrons/components'
 
 export interface ExternalLinkProps extends LinkProps {
   href: string
+  id?: string
   children: JSX.Element
 }
 
 export const ExternalLink = (props: ExternalLinkProps): JSX.Element => (
-  <Link external {...props} color={COLORS.blue} css={TYPOGRAPHY.labelRegular}>
-    {props.children}
-    <Icon
-      width={SPACING.spacing3}
-      height={SPACING.spacing3}
-      marginLeft=".4375rem"
-      name="open-in-new"
-    ></Icon>
+  <Link external {...props}>
+    <Flex alignItems={ALIGN_CENTER} css={TYPOGRAPHY.linkPSemiBold}>
+      {props.children}
+      <Icon size={SPACING.spacing3} marginLeft=".4375rem" name="open-in-new" />
+    </Flex>
   </Link>
 )

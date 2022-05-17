@@ -12,23 +12,15 @@ import type { PrimitiveComponent } from '@opentrons/components'
 type BtnComponent = PrimitiveComponent<'button'>
 
 export const MenuItem: BtnComponent = styled(Btn)`
-  width: ${TYPOGRAPHY.overflowMenuWidth};
   text-align: ${TEXT_ALIGN_LEFT};
   font-size: ${TYPOGRAPHY.fontSizeP};
-  padding-bottom: ${TYPOGRAPHY.fontSizeH6};
   background-color: transparent;
   color: ${COLORS.darkBlack};
-  padding-left: ${TYPOGRAPHY.fontSizeLabel};
-  padding-right: ${TYPOGRAPHY.fontSizeLabel};
-  padding-top: ${SPACING.spacing3};
+  padding: ${SPACING.spacing3} ${SPACING.spacing2} ${SPACING.spacing3}
+    ${SPACING.spacing4};
 
   &:hover {
     background-color: ${COLORS.lightBlue};
-  }
-
-  &:focus,
-  &:active {
-    font-weight: ${TYPOGRAPHY.fontWeightSemiBold};
   }
 
   &:disabled,

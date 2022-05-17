@@ -3,23 +3,14 @@ import argparse
 import asyncio
 import logging
 from logging.config import dictConfig
-from pathlib import Path
 
 from typing_extensions import Final
 
-from opentrons_hardware.drivers.can_bus import CanMessenger
-from opentrons_hardware.drivers.can_bus.build import build_driver
+from opentrons_hardware.drivers.can_bus import build
+from opentrons_hardware.firmware_bindings import NodeId
+from opentrons_hardware.firmware_update.run import run_update
 from .can_args import add_can_args, build_settings
-from opentrons_hardware.firmware_update import (
-    FirmwareUpdateDownloader,
-    FirmwareUpdateInitiator,
-    head,
-    gantry_x,
-    gantry_y,
-    pipette_left,
-    pipette_right,
-    HexRecordProcessor,
-)
+
 
 logger = logging.getLogger(__name__)
 
@@ -45,43 +36,31 @@ LOG_CONFIG = {
 }
 
 TARGETS: Final = {
-    "head": head,
-    "gantry-x": gantry_x,
-    "gantry-y": gantry_y,
-    "pipette-left": pipette_left,
-    "pipette-right": pipette_right,
+    "head": NodeId.head,
+    "gantry-x": NodeId.gantry_x,
+    "gantry-y": NodeId.gantry_y,
+    "pipette-left": NodeId.pipette_left,
+    "pipette-right": NodeId.pipette_right,
+    "gripper": NodeId.gripper,
 }
 
 
 async def run(args: argparse.Namespace) -> None:
     """Entry point for script."""
     target = TARGETS[args.target]
+    retry_count = args.retry_count
+    timeout_seconds = args.timeout_seconds
+    erase = not args.no_erase
 
-    hex_processor = HexRecordProcessor.from_file(Path(args.file))
-
-    driver = await build_driver(build_settings(args))
-
-    messenger = CanMessenger(driver)
-    messenger.start()
-
-    initiator = FirmwareUpdateInitiator(messenger)
-    downloader = FirmwareUpdateDownloader(messenger)
-
-    logger.info(f"Initiating FW Update on {target}.")
-    await initiator.run(
-        target=target,
-        retry_count=args.retry_count,
-        ready_wait_time_sec=args.timeout_seconds,
-    )
-
-    logger.info(f"Downloading FW to {target.bootloader_node}.")
-    await downloader.run(
-        node_id=target.bootloader_node,
-        hex_processor=hex_processor,
-        ack_wait_seconds=args.timeout_seconds,
-    )
-
-    await messenger.stop()
+    async with build.can_messenger(build_settings(args)) as messenger:
+        await run_update(
+            messenger=messenger,
+            node_id=target,
+            hex_file=args.file,
+            retry_count=retry_count,
+            timeout_seconds=timeout_seconds,
+            erase=erase,
+        )
 
     logger.info("Done")
 
@@ -103,7 +82,7 @@ def main() -> None:
     parser.add_argument(
         "--file",
         help="Path to hex file containing the FW executable.",
-        type=str,
+        type=argparse.FileType("r"),
         required=True,
     )
     parser.add_argument(
@@ -113,7 +92,13 @@ def main() -> None:
         default=3,
     )
     parser.add_argument(
-        "--timeout-seconds", help="Number of seconds to wait.", type=float, default=2
+        "--timeout-seconds", help="Number of seconds to wait.", type=float, default=10
+    )
+    parser.add_argument(
+        "--no-erase",
+        help="Don't erase existing application from flash.",
+        action="store_true",
+        default=False,
     )
 
     args = parser.parse_args()

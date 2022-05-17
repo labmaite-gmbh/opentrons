@@ -3,8 +3,10 @@ import {
   MAGNETIC_MODULE_TYPE,
   TEMPERATURE_MODULE_TYPE,
   THERMOCYCLER_MODULE_TYPE,
+  HEATERSHAKER_MODULE_TYPE,
 } from '@opentrons/shared-data'
 import type {
+  CreateCommand,
   LabwareDefinition2,
   ModuleType,
   ModuleModel,
@@ -22,6 +24,7 @@ import type {
   TEMPERATURE_AT_TARGET,
   TEMPERATURE_APPROACHING_TARGET,
 } from './constants'
+import { ShakeSpeedParams } from '@opentrons/shared-data/protocol/types/schemaV6/command/module'
 
 export type { Command }
 
@@ -59,12 +62,19 @@ export interface ThermocyclerModuleState {
   lidOpen: boolean | null // if false, closed. If null, unknown
 }
 
+export interface HeaterShakerModuleState {
+  type: typeof HEATERSHAKER_MODULE_TYPE
+  targetTemp: number | null
+  targetSpeed: number | null
+  latchOpen: boolean | null
+}
 export interface ModuleTemporalProperties {
   slot: DeckSlot
   moduleState:
     | MagneticModuleState
     | TemperatureModuleState
     | ThermocyclerModuleState
+    | HeaterShakerModuleState
 }
 
 export interface LabwareEntity {
@@ -274,9 +284,9 @@ export type PauseArgs = CommonArgs & {
     | undefined
 }
 
-export interface AwaitTemperatureArgs {
+export interface WaitForTemperatureArgs {
   module: string | null
-  commandCreatorFnName: 'awaitTemperature'
+  commandCreatorFnName: 'waitForTemperature'
   temperature: number
   message?: string
 }
@@ -303,6 +313,23 @@ export interface SetTemperatureArgs {
 export interface DeactivateTemperatureArgs {
   module: string | null
   commandCreatorFnName: 'deactivateTemperature'
+  message?: string
+}
+
+export type SetShakeSpeedArgs = ShakeSpeedParams & {
+  moduleId: string
+  commandCreatorFnName: 'setShakeSpeed'
+  message?: string
+}
+
+export interface HeaterShakerArgs {
+  module: string
+  rpm: number | null
+  commandCreatorFnName: 'heaterShaker'
+  targetTemperature: number | null
+  latchOpen: boolean
+  timerMinutes: number | null
+  timerSeconds: number | null
   message?: string
 }
 
@@ -361,10 +388,11 @@ export type CommandCreatorArgs =
   | EngageMagnetArgs
   | DisengageMagnetArgs
   | SetTemperatureArgs
-  | AwaitTemperatureArgs
+  | WaitForTemperatureArgs
   | DeactivateTemperatureArgs
   | ThermocyclerProfileStepArgs
   | ThermocyclerStateStepArgs
+  | HeaterShakerArgs
 
 export interface LocationLiquidState {
   [ingredGroup: string]: { volume: number }
@@ -445,7 +473,8 @@ export type ErrorType =
   | 'MISSING_TEMPERATURE_STEP'
   | 'THERMOCYCLER_LID_CLOSED'
   | 'INVALID_SLOT'
-
+  | 'HEATER_SHAKER_LATCH_OPEN'
+  | 'HEATER_SHAKER_IS_SHAKING'
 export interface CommandCreatorError {
   message: string
   type: ErrorType
@@ -461,7 +490,7 @@ export interface CommandCreatorWarning {
 }
 
 export interface CommandsAndRobotState {
-  commands: Command[]
+  commands: CreateCommand[]
   robotState: RobotState
   warnings?: CommandCreatorWarning[]
 }
@@ -472,7 +501,7 @@ export interface CommandCreatorErrorResponse {
 }
 
 export interface CommandsAndWarnings {
-  commands: Command[]
+  commands: CreateCommand[]
   warnings?: CommandCreatorWarning[]
 }
 export type CommandCreatorResult =

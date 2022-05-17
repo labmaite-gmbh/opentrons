@@ -41,7 +41,7 @@ electron := electron . \
 	--disable_ui.webPreferences.webSecurity \
 	--ui.url.protocol="http:" \
 	--ui.url.path="localhost:$(PORT)" \
-	--discovery.candidates=localhost
+	--python.pathToPythonOverride=$(shell cd ../api && pipenv --venv)
 
 # standard targets
 #####################################################################
@@ -57,7 +57,7 @@ setup:
 
 .PHONY: clean
 clean:
-	shx rm -rf lib dist
+	shx rm -rf lib dist python
 
 # artifacts
 #####################################################################
@@ -112,8 +112,8 @@ dist-ubuntu-latest: dist-linux
 .PHONY: dist-ubuntu-18.04
 dist-ubuntu-18.04: dist-linux
 
-.PHONY: dist-windows-latest
-dist-windows-latest: dist-win
+.PHONY: dist-windows-2019
+dist-windows-2019: dist-win
 
 # copy distributable artifacts to the publish directory
 # update files will not exist for all OSs, so noop if cp errors

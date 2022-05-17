@@ -1,26 +1,36 @@
 import * as React from 'react'
-import cx from 'classnames'
-
-import styles from './modals.css'
+import { Flex, POSITION_FIXED } from '..'
 
 export interface OverlayProps {
   /** optional onClick handler */
   onClick?: React.MouseEventHandler
-  alertOverlay?: boolean | null | undefined
+  alertOverlay?: boolean | null
+  backgroundColor?: string
 }
 
-/**
- * Dark, semi-transparent overlay for the background of a modal. If you need
- * to make a custom modal component, use `<Overlay>`, otherwise you might
- * just want to use `<Modal>`
- */
 export function Overlay(props: OverlayProps): JSX.Element {
-  const { alertOverlay, onClick } = props
-  // @ts-expect-error(sa, 2021-6-23): cast value to boolean
-  const className = cx(styles.overlay, {
-    [styles.clickable]: onClick,
-    [styles.alert_modal_overlay]: alertOverlay,
-  })
+  const {
+    alertOverlay,
+    backgroundColor = 'rgba(0, 0, 0, 0.9)',
+    onClick,
+  } = props
 
-  return <div className={className} onClick={onClick} />
+  const alertOverlayBackgroundColor = 'rgba(115, 115, 115, 0.9)'
+
+  return (
+    <Flex
+      position={POSITION_FIXED}
+      left="0"
+      right="0"
+      top="0"
+      bottom="0"
+      zIndex="1"
+      backgroundColor={
+        alertOverlay != null && alertOverlay
+          ? alertOverlayBackgroundColor
+          : backgroundColor
+      }
+      onClick={onClick}
+    />
+  )
 }

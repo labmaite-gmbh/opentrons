@@ -80,6 +80,8 @@
     "cypress": "^6.6.0",
     "cypress-file-upload": "3.5.3",
     "cz-conventional-changelog": "2.1.0",
+    "decompress": "4.2.1",
+    "download": "8.0.0",
     "electron": "13.1.8",
     "electron-builder": "^22.12.0",
     "electron-notarize": "^1.1.0",
@@ -160,7 +162,6 @@
     "webpack-dev-server": "^3.10.3",
     "webpack-merge": "^4.2.2",
     "webpack-node-externals": "^1.7.2",
-    "worker-plugin": "^5.0.0",
-    "ws": "7.1.2"
+    "worker-plugin": "^5.0.0"
   }
 }

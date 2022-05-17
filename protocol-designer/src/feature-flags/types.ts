@@ -15,6 +15,7 @@ export const DEPRECATED_FLAGS = [
   'OT_PD_ENABLE_AIR_GAP_DISPENSE',
   'BATCH_EDIT_ENABLED',
   'OT_PD_ENABLE_BATCH_EDIT_MIX',
+  'OT_PD_ENABLE_SCHEMA_V6',
 ]
 // union of feature flag string constant IDs
 export type FlagTypes =

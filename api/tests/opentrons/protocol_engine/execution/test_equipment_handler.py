@@ -2,11 +2,18 @@
 import pytest
 from datetime import datetime
 from decoy import Decoy, matchers
+from typing import Any, cast
+
 from opentrons.calibration_storage.helpers import uri_from_details
 
 from opentrons.types import Mount as HwMount, MountType, DeckSlotName
-from opentrons.hardware_control import API as HardwareAPI
-from opentrons.hardware_control.modules import TempDeck, AbstractModule
+from opentrons.hardware_control import HardwareControlAPI
+from opentrons.hardware_control.modules import (
+    TempDeck,
+    MagDeck,
+    HeaterShaker,
+    AbstractModule,
+)
 from opentrons.protocols.models import LabwareDefinition
 
 from opentrons.protocol_engine import EngineConfigs, errors
@@ -15,7 +22,6 @@ from opentrons.protocol_engine.types import (
     ModuleLocation,
     PipetteName,
     LoadedPipette,
-    LoadedModule,
     LabwareOffset,
     LabwareOffsetVector,
     LabwareOffsetLocation,
@@ -45,9 +51,9 @@ def state_store(decoy: Decoy) -> StateStore:
 
 
 @pytest.fixture
-def hardware_api(decoy: Decoy) -> HardwareAPI:
-    """Get a mocked out HardwareAPI instance."""
-    return decoy.mock(cls=HardwareAPI)
+def hardware_api(decoy: Decoy) -> HardwareControlAPI:
+    """Get a mocked out HardwareControlAPI instance."""
+    return decoy.mock(cls=HardwareControlAPI)
 
 
 @pytest.fixture
@@ -72,7 +78,7 @@ def module_data_provider(decoy: Decoy) -> ModuleDataProvider:
 async def temp_module_v1(decoy: Decoy) -> TempDeck:
     """Get a mocked out module fixture."""
     temp_mod = decoy.mock(cls=TempDeck)
-    temp_mod.device_info = {"serial": "serial-1"}  # type: ignore[misc]
+    decoy.when(temp_mod.device_info).then_return({"serial": "serial-1"})
     decoy.when(temp_mod.model()).then_return("temperatureModuleV1")
 
     return temp_mod
@@ -82,7 +88,7 @@ async def temp_module_v1(decoy: Decoy) -> TempDeck:
 async def temp_module_v2(decoy: Decoy) -> TempDeck:
     """Get a mocked out module fixture."""
     temp_mod = decoy.mock(cls=TempDeck)
-    temp_mod.device_info = {"serial": "serial-2"}  # type: ignore[misc]
+    decoy.when(temp_mod.device_info).then_return({"serial": "serial-2"})
     decoy.when(temp_mod.model()).then_return("temperatureModuleV2")
 
     return temp_mod
@@ -90,7 +96,7 @@ async def temp_module_v2(decoy: Decoy) -> TempDeck:
 
 @pytest.fixture
 def subject(
-    hardware_api: HardwareAPI,
+    hardware_api: HardwareControlAPI,
     state_store: StateStore,
     labware_data_provider: LabwareDataProvider,
     module_data_provider: ModuleDataProvider,
@@ -268,14 +274,11 @@ async def test_load_labware_on_module(
         state_store.labware.get_definition_by_uri(matchers.IsA(str))
     ).then_return(minimal_labware_def)
 
-    decoy.when(state_store.modules.get("module-id")).then_return(
-        LoadedModule(
-            id="module-id",
-            model=ModuleModel.THERMOCYCLER_MODULE_V1,
-            serialNumber="module-serial",
-            location=DeckSlotLocation(slotName=DeckSlotName.SLOT_3),
-            definition=tempdeck_v1_def,
-        )
+    decoy.when(state_store.modules.get_model("module-id")).then_return(
+        ModuleModel.THERMOCYCLER_MODULE_V1
+    )
+    decoy.when(state_store.modules.get_location("module-id")).then_return(
+        DeckSlotLocation(slotName=DeckSlotName.SLOT_3)
     )
 
     decoy.when(
@@ -317,7 +320,7 @@ async def test_load_labware_on_module(
 async def test_load_pipette(
     decoy: Decoy,
     model_utils: ModelUtils,
-    hardware_api: HardwareAPI,
+    hardware_api: HardwareControlAPI,
     subject: EquipmentHandler,
 ) -> None:
     """It should load pipette data, check attachment, and generate an ID."""
@@ -352,7 +355,7 @@ async def test_load_pipette_checks_existence_with_already_loaded(
     decoy: Decoy,
     model_utils: ModelUtils,
     state_store: StateStore,
-    hardware_api: HardwareAPI,
+    hardware_api: HardwareControlAPI,
     subject: EquipmentHandler,
 ) -> None:
     """Loading a pipette should cache with pipettes already attached."""
@@ -386,7 +389,7 @@ async def test_load_pipette_checks_existence_with_already_loaded(
 async def test_load_pipette_raises_if_pipette_not_attached(
     decoy: Decoy,
     model_utils: ModelUtils,
-    hardware_api: HardwareAPI,
+    hardware_api: HardwareControlAPI,
     subject: EquipmentHandler,
 ) -> None:
     """Loading a pipette should should raise if unable to cache instruments."""
@@ -418,7 +421,7 @@ async def test_load_module(
     model_utils: ModelUtils,
     state_store: StateStore,
     module_data_provider: ModuleDataProvider,
-    hardware_api: HardwareAPI,
+    hardware_api: HardwareControlAPI,
     tempdeck_v1_def: ModuleDefinition,
     tempdeck_v2_def: ModuleDefinition,
     temp_module_v1: AbstractModule,
@@ -436,17 +439,19 @@ async def test_load_module(
         module_data_provider.get_definition(ModuleModel.TEMPERATURE_MODULE_V2)
     ).then_return(tempdeck_v2_def)
 
-    hardware_api.attached_modules = [  # type: ignore[misc]
-        temp_module_v1,
-        temp_module_v2,
-    ]
+    decoy.when(hardware_api.attached_modules).then_return(
+        [
+            temp_module_v1,
+            temp_module_v2,
+        ]
+    )
 
     decoy.when(state_store.get_configs()).then_return(
         EngineConfigs(use_virtual_modules=False)
     )
 
     decoy.when(
-        state_store.modules.find_attached_module(
+        state_store.modules.select_hardware_module_to_load(
             model=ModuleModel.TEMPERATURE_MODULE_V1,
             location=DeckSlotLocation(slotName=DeckSlotName.SLOT_1),
             attached_modules=[
@@ -474,7 +479,7 @@ async def test_load_module_using_virtual(
     model_utils: ModelUtils,
     state_store: StateStore,
     module_data_provider: ModuleDataProvider,
-    hardware_api: HardwareAPI,
+    hardware_api: HardwareControlAPI,
     tempdeck_v1_def: ModuleDefinition,
     tempdeck_v2_def: ModuleDefinition,
     temp_module_v1: AbstractModule,
@@ -484,7 +489,9 @@ async def test_load_module_using_virtual(
     """It should load a virtual module."""
     decoy.when(model_utils.ensure_id("input-module-id")).then_return("module-id")
 
-    decoy.when(model_utils.generate_id()).then_return("fake-serial-number")
+    decoy.when(model_utils.generate_id(prefix="fake-serial-number-")).then_return(
+        "fake-serial-number-abc123"
+    )
 
     decoy.when(
         module_data_provider.get_definition(ModuleModel.TEMPERATURE_MODULE_V1)
@@ -502,6 +509,93 @@ async def test_load_module_using_virtual(
 
     assert result == LoadedModuleData(
         module_id="module-id",
-        serial_number="fake-serial-number",
+        serial_number="fake-serial-number-abc123",
         definition=tempdeck_v1_def,
     )
+
+
+def test_get_module_hardware_api(
+    decoy: Decoy,
+    state_store: StateStore,
+    hardware_api: HardwareControlAPI,
+    subject: EquipmentHandler,
+) -> None:
+    """It should get a module's hardware API."""
+    module_1 = decoy.mock(cls=TempDeck)
+    module_2 = decoy.mock(cls=MagDeck)
+    module_3 = decoy.mock(cls=HeaterShaker)
+
+    decoy.when(state_store.get_configs()).then_return(
+        EngineConfigs(use_virtual_modules=False)
+    )
+    decoy.when(state_store.modules.get_serial_number("module-id")).then_return(
+        "serial-2"
+    )
+
+    decoy.when(module_1.device_info).then_return({"serial": "serial-1"})
+    decoy.when(module_2.device_info).then_return({"serial": "serial-2"})
+    decoy.when(module_3.device_info).then_return({"serial": "serial-3"})
+    decoy.when(hardware_api.attached_modules).then_return(
+        [module_1, module_2, module_3]
+    )
+
+    result = subject.get_module_hardware_api(cast(Any, "module-id"))
+    assert result is module_2
+
+
+def test_get_module_hardware_api_virtual(
+    decoy: Decoy,
+    state_store: StateStore,
+    hardware_api: HardwareControlAPI,
+    subject: EquipmentHandler,
+) -> None:
+    """It should return None if modules are being virtualized."""
+    module_1 = decoy.mock(cls=TempDeck)
+    module_2 = decoy.mock(cls=MagDeck)
+    module_3 = decoy.mock(cls=HeaterShaker)
+
+    decoy.when(state_store.get_configs()).then_return(
+        EngineConfigs(use_virtual_modules=True)
+    )
+    decoy.when(state_store.modules.get_serial_number("module-id")).then_return(
+        "serial-2"
+    )
+
+    decoy.when(module_1.device_info).then_return({"serial": "serial-1"})
+    decoy.when(module_2.device_info).then_return({"serial": "serial-2"})
+    decoy.when(module_3.device_info).then_return({"serial": "serial-3"})
+    decoy.when(hardware_api.attached_modules).then_return(
+        [module_1, module_2, module_3]
+    )
+
+    result = subject.get_module_hardware_api(cast(Any, "module-id"))
+    assert result is None
+
+
+def test_get_module_hardware_api_missing(
+    decoy: Decoy,
+    state_store: StateStore,
+    hardware_api: HardwareControlAPI,
+    subject: EquipmentHandler,
+) -> None:
+    """It should raise an error if a module's hardware API is not found."""
+    module_1 = decoy.mock(cls=TempDeck)
+    module_2 = decoy.mock(cls=MagDeck)
+    module_3 = decoy.mock(cls=HeaterShaker)
+
+    decoy.when(state_store.get_configs()).then_return(
+        EngineConfigs(use_virtual_modules=False)
+    )
+    decoy.when(state_store.modules.get_serial_number("module-id")).then_return(
+        "the-limit-does-not-exist"
+    )
+
+    decoy.when(module_1.device_info).then_return({"serial": "serial-1"})
+    decoy.when(module_2.device_info).then_return({"serial": "serial-2"})
+    decoy.when(module_3.device_info).then_return({"serial": "serial-3"})
+    decoy.when(hardware_api.attached_modules).then_return(
+        [module_1, module_2, module_3]
+    )
+
+    with pytest.raises(errors.ModuleNotAttachedError):
+        subject.get_module_hardware_api(cast(Any, "module-id"))

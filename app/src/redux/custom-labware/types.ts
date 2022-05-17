@@ -50,6 +50,7 @@ export interface CustomLabwareState {
   readonly addFailureFile: FailedLabwareFile | null
   readonly addFailureMessage: string | null
   readonly listFailureMessage: string | null
+  readonly newLabwareName: string | null
 }
 
 // action types
@@ -58,6 +59,7 @@ export type CustomLabwareListActionSource =
   | 'poll'
   | 'initial'
   | 'addLabware'
+  | 'deleteLabware'
   | 'overwriteLabware'
   | 'changeDirectory'
 
@@ -89,6 +91,18 @@ export interface AddCustomLabwareAction {
   meta: { shell: true }
 }
 
+export interface AddCustomLabwareFileAction {
+  type: 'labware:ADD_CUSTOM_LABWARE_FILE'
+  payload: { filePath: string }
+  meta: { shell: true }
+}
+
+export interface DeleteCustomLabwareFileAction {
+  type: 'labware:DELETE_CUSTOM_LABWARE_FILE'
+  payload: { filePath: string }
+  meta: { shell: true }
+}
+
 export interface AddCustomLabwareFailureAction {
   type: 'labware:ADD_CUSTOM_LABWARE_FAILURE'
   payload: { labware: FailedLabwareFile | null; message: string | null }
@@ -96,6 +110,15 @@ export interface AddCustomLabwareFailureAction {
 
 export interface ClearAddCustomLabwareFailureAction {
   type: 'labware:CLEAR_ADD_CUSTOM_LABWARE_FAILURE'
+}
+
+export interface AddNewLabwareNameAction {
+  type: 'labware:ADD_NEW_LABWARE_NAME'
+  payload: { filename: string }
+}
+
+export interface ClearNewLabwareNameAction {
+  type: 'labware:CLEAR_NEW_LABWARE_NAME'
 }
 
 export interface OpenCustomLabwareDirectoryAction {
@@ -109,6 +132,10 @@ export type CustomLabwareAction =
   | CustomLabwareListFailureAction
   | ChangeCustomLabwareDirectoryAction
   | AddCustomLabwareAction
+  | AddCustomLabwareFileAction
+  | DeleteCustomLabwareFileAction
   | AddCustomLabwareFailureAction
   | ClearAddCustomLabwareFailureAction
+  | AddNewLabwareNameAction
+  | ClearNewLabwareNameAction
   | OpenCustomLabwareDirectoryAction

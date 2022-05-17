@@ -1,52 +1,76 @@
 import * as React from 'react'
 import { fireEvent } from '@testing-library/react'
 import { renderWithProviders } from '@opentrons/components'
-import { Banner } from '../Banner'
+import { i18n } from '../../../i18n'
+import { Banner } from '..'
 
 const render = (props: React.ComponentProps<typeof Banner>) => {
-  return renderWithProviders(<Banner {...props} />)[0]
+  return renderWithProviders(<Banner {...props} />, {
+    i18nInstance: i18n,
+  })[0]
 }
 
-describe('HeaterShakerBanner', () => {
+describe('Banner', () => {
   let props: React.ComponentProps<typeof Banner>
+
   beforeEach(() => {
     props = {
-      title: 'TITLE',
-      body: 'BODY',
-      btnText: 'btnText',
-      subtitle: 'SUBTITLE',
-      onClick: jest.fn(),
+      type: 'success',
+      children: 'TITLE',
     }
   })
-
-  it('should render correct text when subtitle is not null', () => {
+  it('renders success banner', () => {
+    const { getByText, getByLabelText } = render(props)
+    getByLabelText('icon_success')
+    getByText('TITLE')
+  })
+  it('renders success banner with exit button and when click dismisses banner', () => {
+    props = {
+      type: 'success',
+      children: 'TITLE',
+      onCloseClick: jest.fn(),
+    }
     const { getByText, getByLabelText } = render(props)
     getByText('TITLE')
-    getByText('BODY')
-    getByText('btnText')
-    getByText('SUBTITLE')
-    getByLabelText('information_icon')
+    const btn = getByLabelText('close_icon')
+    fireEvent.click(btn)
+    expect(props.onCloseClick).toHaveBeenCalled()
   })
-
-  it('should render correct text when subtitle null', () => {
+  it('renders warning banner', () => {
     props = {
-      title: 'TITLE',
-      body: 'BODY',
-      btnText: 'btnText',
-      onClick: jest.fn(),
+      type: 'warning',
+      children: 'TITLE',
     }
-    const { getByText } = render(props)
+    const { getByText, getByLabelText } = render(props)
+    getByLabelText('icon_warning')
     getByText('TITLE')
-    getByText('BODY')
-    getByText('btnText')
   })
-
-  it('should render button and it is clickable', () => {
-    const { getByRole } = render(props)
-    const button = getByRole('button', {
-      name: 'btnText',
-    })
-    fireEvent.click(button)
-    expect(button).toBeEnabled()
+  it('renders error banner', () => {
+    props = {
+      type: 'error',
+      children: 'TITLE',
+    }
+    const { getByText, getByLabelText } = render(props)
+    getByLabelText('icon_error')
+    getByText('TITLE')
+  })
+  it('renders updating banner', () => {
+    props = {
+      type: 'updating',
+      children: 'TITLE',
+    }
+    const { getByText, getByLabelText } = render(props)
+    getByLabelText('icon_updating')
+    getByText('TITLE')
+  })
+  it('renders custom icon banner', () => {
+    props = {
+      type: 'warning',
+      children: 'TITLE',
+      icon: { name: 'ot-hot-to-touch' },
+    }
+    const { getByText, getByLabelText } = render(props)
+    getByLabelText('icon_warning')
+    getByText('TITLE')
   })
 })

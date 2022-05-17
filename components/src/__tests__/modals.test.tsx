@@ -18,7 +18,9 @@ describe('modals', () => {
       <Modal onCloseClick={onCloseClick}>children</Modal>
     ).root
 
-    const overlay = root.findByProps({ className: 'overlay clickable' })
+    const overlay = root.findByProps({
+      backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    })
     overlay.props.onClick()
 
     expect(onCloseClick).toHaveBeenCalled()
@@ -58,7 +60,9 @@ describe('modals', () => {
       </ContinueModal>
     ).root
 
-    const overlay = root.findByProps({ className: 'overlay clickable' })
+    const overlay = root.findByProps({
+      backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    })
 
     overlay.props.onClick()
     expect(onCancelClick).toHaveBeenCalled()

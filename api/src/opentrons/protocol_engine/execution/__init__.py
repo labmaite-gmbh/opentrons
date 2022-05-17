@@ -8,9 +8,10 @@ from .equipment import (
     LoadedPipetteData,
     LoadedModuleData,
 )
-from .movement import MovementHandler, SavedPositionData
+from .movement import MovementHandler, MoveRelativeData, SavedPositionData
 from .pipetting import PipettingHandler
 from .queue_worker import QueueWorker
+from .rail_lights import RailLightsHandler
 from .run_control import RunControlHandler
 from .hardware_stopper import HardwareStopper
 from .hardware_event_forwarder import HardwareEventForwarder
@@ -26,10 +27,12 @@ __all__ = [
     "LoadedPipetteData",
     "LoadedModuleData",
     "MovementHandler",
+    "MoveRelativeData",
     "SavedPositionData",
     "PipettingHandler",
     "QueueWorker",
     "RunControlHandler",
     "HardwareStopper",
     "HardwareEventForwarder",
+    "RailLightsHandler",
 ]

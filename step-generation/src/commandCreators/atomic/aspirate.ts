@@ -3,9 +3,11 @@ import { getPipetteWithTipMaxVol } from '../../robotStateSelectors'
 import {
   modulePipetteCollision,
   thermocyclerPipetteCollision,
+  pipetteIntoHeaterShakerLatchOpen,
+  pipetteIntoHeaterShakerWhileShaking,
 } from '../../utils'
+import type { CreateCommand } from '@opentrons/shared-data'
 import type { AspirateParams } from '@opentrons/shared-data/protocol/types/schemaV3'
-import type { Command } from '@opentrons/shared-data/protocol/types/schemaV5Addendum'
 import type { CommandCreator, CommandCreatorError } from '../../types'
 
 /** Aspirate with given args. Requires tip. */
@@ -69,6 +71,26 @@ export const aspirate: CommandCreator<AspirateParams> = (
     errors.push(errorCreators.thermocyclerLidClosed())
   }
 
+  if (
+    pipetteIntoHeaterShakerLatchOpen(
+      prevRobotState.modules,
+      prevRobotState.labware,
+      labware
+    )
+  ) {
+    errors.push(errorCreators.heaterShakerLatchOpen())
+  }
+
+  if (
+    pipetteIntoHeaterShakerWhileShaking(
+      prevRobotState.modules,
+      prevRobotState.labware,
+      labware
+    )
+  ) {
+    errors.push(errorCreators.heaterShakerIsShaking())
+  }
+
   if (errors.length === 0 && pipetteSpec && pipetteSpec.maxVolume < volume) {
     errors.push(
       errorCreators.pipetteVolumeExceeded({
@@ -99,15 +121,20 @@ export const aspirate: CommandCreator<AspirateParams> = (
     }
   }
 
-  const commands: Command[] = [
+  const commands: CreateCommand[] = [
     {
-      command: 'aspirate',
+      commandType: 'aspirate',
       params: {
-        pipette,
+        pipetteId: pipette,
         volume,
-        labware,
-        well,
-        offsetFromBottomMm,
+        labwareId: labware,
+        wellName: well,
+        wellLocation: {
+          origin: 'bottom',
+          offset: {
+            z: offsetFromBottomMm,
+          },
+        },
         flowRate,
       },
     },

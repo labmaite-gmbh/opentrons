@@ -8,9 +8,9 @@ disk into the runner, and the protocols are run to completion. From
 there, the ProtocolEngine state is inspected to everything was loaded
 and ran as expected.
 """
-import pytest
 from datetime import datetime
 from decoy import matchers
+from pathlib import Path
 
 from opentrons.types import MountType, DeckSlotName
 
@@ -24,31 +24,27 @@ from opentrons.protocol_engine import (
     PipetteName,
     commands,
 )
-from opentrons.protocol_reader import (
-    ProtocolReader,
-    InputFile,
-    ProtocolFilesInvalidError,
-)
+from opentrons.protocol_reader import ProtocolReader
 from opentrons.protocol_runner import create_simulating_runner
 
 
 async def test_runner_with_python(
-    protocol_reader: ProtocolReader,
-    python_protocol_file: InputFile,
+    python_protocol_file: Path,
     tempdeck_v1_def: ModuleDefinition,
 ) -> None:
     """It should run a Python protocol on the ProtocolRunner."""
-    protocol_source = await protocol_reader.read(
-        name="test_protocol",
+    protocol_reader = ProtocolReader()
+    protocol_source = await protocol_reader.read_saved(
         files=[python_protocol_file],
+        directory=None,
     )
 
     subject = await create_simulating_runner()
     result = await subject.run(protocol_source)
     commands_result = result.commands
-    pipettes_result = result.pipettes
-    labware_result = result.labware
-    modules_result = result.modules
+    pipettes_result = result.state_summary.pipettes
+    labware_result = result.state_summary.labware
+    modules_result = result.state_summary.modules
 
     pipette_id_captor = matchers.Captor()
     labware_id_captor = matchers.Captor()
@@ -100,22 +96,19 @@ async def test_runner_with_python(
     assert expected_command in commands_result
 
 
-@pytest.mark.xfail(raises=ProtocolFilesInvalidError, strict=True)
-async def test_runner_with_json(
-    protocol_reader: ProtocolReader,
-    json_protocol_file: InputFile,
-) -> None:
+async def test_runner_with_json(json_protocol_file: Path) -> None:
     """It should run a JSON protocol on the ProtocolRunner."""
-    protocol_source = await protocol_reader.read(
-        name="test_protocol",
+    protocol_reader = ProtocolReader()
+    protocol_source = await protocol_reader.read_saved(
         files=[json_protocol_file],
+        directory=None,
     )
 
     subject = await create_simulating_runner()
     result = await subject.run(protocol_source)
     commands_result = result.commands
-    pipettes_result = result.pipettes
-    labware_result = result.labware
+    pipettes_result = result.state_summary.pipettes
+    labware_result = result.state_summary.labware
 
     expected_pipette = LoadedPipette(
         id="pipette-id",
@@ -155,22 +148,20 @@ async def test_runner_with_json(
     assert expected_command in commands_result
 
 
-async def test_runner_with_legacy_python(
-    protocol_reader: ProtocolReader,
-    legacy_python_protocol_file: InputFile,
-) -> None:
+async def test_runner_with_legacy_python(legacy_python_protocol_file: Path) -> None:
     """It should run a Python protocol on the ProtocolRunner."""
-    protocol_source = await protocol_reader.read(
-        name="test_protocol",
+    protocol_reader = ProtocolReader()
+    protocol_source = await protocol_reader.read_saved(
         files=[legacy_python_protocol_file],
+        directory=None,
     )
 
     subject = await create_simulating_runner()
     result = await subject.run(protocol_source)
 
     commands_result = result.commands
-    pipettes_result = result.pipettes
-    labware_result = result.labware
+    pipettes_result = result.state_summary.pipettes
+    labware_result = result.state_summary.labware
 
     pipette_id_captor = matchers.Captor()
     labware_id_captor = matchers.Captor()
@@ -212,22 +203,20 @@ async def test_runner_with_legacy_python(
     assert expected_command in commands_result
 
 
-async def test_runner_with_legacy_json(
-    protocol_reader: ProtocolReader,
-    legacy_json_protocol_file: InputFile,
-) -> None:
+async def test_runner_with_legacy_json(legacy_json_protocol_file: Path) -> None:
     """It should run a Python protocol on the ProtocolRunner."""
-    protocol_source = await protocol_reader.read(
-        name="test_protocol",
+    protocol_reader = ProtocolReader()
+    protocol_source = await protocol_reader.read_saved(
         files=[legacy_json_protocol_file],
+        directory=None,
     )
 
     subject = await create_simulating_runner()
     result = await subject.run(protocol_source)
 
     commands_result = result.commands
-    pipettes_result = result.pipettes
-    labware_result = result.labware
+    pipettes_result = result.state_summary.pipettes
+    labware_result = result.state_summary.labware
 
     pipette_id_captor = matchers.Captor()
     labware_id_captor = matchers.Captor()
