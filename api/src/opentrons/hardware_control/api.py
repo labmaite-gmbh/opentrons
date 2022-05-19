@@ -776,7 +776,6 @@ class API(
             if acquire_lock:
                 await stack.enter_async_context(self._motion_lock)
             try:
-                print(f'[api.py] machine_pos:{machine_pos}')
                 await self._backend.move(
                     machine_pos,
                     speed=speed,
@@ -902,7 +901,6 @@ class API(
         """
         Aspirate a volume of liquid (in microliters/uL) using this pipette.
         """
-        print('-------\nASPIRATE')
         aspirate_spec = self.plan_check_aspirate(mount, volume, rate)
         if not aspirate_spec:
             return
@@ -913,8 +911,6 @@ class API(
         )
         # FIXME: (andy s) should this be added to aspirate_spec?
         target_pos[Axis.by_mount(mount)] += height_adjust
-        print(f'height_adjust={height_adjust}')
-        print(f'target_pos:{target_pos}')
         try:
             self._backend.set_active_current(
                 {aspirate_spec.plunger_axis: aspirate_spec.plunger_current}
@@ -941,7 +937,6 @@ class API(
         """
         Dispense a volume of liquid in microliters(uL) using this pipette.
         """
-        print('-------\nDISPENSE')
         dispense_spec = self.plan_check_dispense(mount, volume, rate)
         if not dispense_spec:
             return
@@ -952,8 +947,6 @@ class API(
         )
         # FIXME: (andy s) should this be added to dispense_spec?
         target_pos[Axis.by_mount(mount)] += height_adjust
-        print(f'height_adjust={height_adjust}')
-        print(f'target_pos:{target_pos}')
         try:
             self._backend.set_active_current(
                 {dispense_spec.plunger_axis: dispense_spec.plunger_current}
