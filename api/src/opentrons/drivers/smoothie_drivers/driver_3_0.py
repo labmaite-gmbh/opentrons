@@ -1379,22 +1379,34 @@ class SmoothieDriver:
         if home_flagged_axes:
             await self.home_flagged_axes("".join(list(target.keys())))
 
+        def _print_test_gcode(cmd: CommandBuilder):
+            ret = str(cmd).strip()
+            cnt = 0
+            for c in str(cmd).strip().split(' '):
+                if c[0] in 'GM':
+                    cnt += 1
+                    ret += f'\n\t{cnt}) '
+                ret += c
+                ret += ' '
+            return ret
+
         async def _do_split() -> None:
             try:
                 for sc in (c for c in (split_prefix, split_command) if c):
-                    print(f'[smoothie] _do_split={sc}')
+                    print(f"[sc] _send_command: {_print_test_gcode(sc)}")
                     await self._send_command(sc)
             finally:
                 if split_postfix:
-                    print(f'[smoothie] split_postfix={split_postfix}')
+                    print(f"[split_postfix] _send_command: {_print_test_gcode(split_postfix)}")
                     await self._send_command(split_postfix)
 
         try:
             log.debug(f"move: {command}")
-            print(f"[smoothie] move: {command}")
             # TODO (hmg) a movement's timeout should be calculated by
             # how long the movement is expected to take.
+            print(target)
             await _do_split()
+            print(f"[command] _send_command: {_print_test_gcode(command)}")
             await self._send_command(command, timeout=DEFAULT_EXECUTE_TIMEOUT)
         finally:
             # dwell pipette motors because they get hot
