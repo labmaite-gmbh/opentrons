@@ -159,6 +159,7 @@ class Controller:
                 await cmstack.enter_async_context(
                     self._smoothie_driver.restore_axis_max_speed(axis_max_speeds)
                 )
+            print(f'[controller.py] target_position={target_position}')
             await self._smoothie_driver.move(
                 target_position, home_flagged_axes=home_flagged_axes, speed=speed
             )

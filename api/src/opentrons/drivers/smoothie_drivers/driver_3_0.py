@@ -1382,13 +1382,16 @@ class SmoothieDriver:
         async def _do_split() -> None:
             try:
                 for sc in (c for c in (split_prefix, split_command) if c):
+                    print(f'[smoothie] _do_split={sc}')
                     await self._send_command(sc)
             finally:
                 if split_postfix:
+                    print(f'[smoothie] split_postfix={split_postfix}')
                     await self._send_command(split_postfix)
 
         try:
             log.debug(f"move: {command}")
+            print(f"[smoothie] move: {command}")
             # TODO (hmg) a movement's timeout should be calculated by
             # how long the movement is expected to take.
             await _do_split()
