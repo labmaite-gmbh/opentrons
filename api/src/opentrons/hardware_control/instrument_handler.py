@@ -52,12 +52,13 @@ AxisType = TypeVar("AxisType", Axis, OT3Axis)
 
 @dataclass(frozen=True)
 class LiquidActionSpec(Generic[AxisType]):
-    axis: AxisType
+    plunger_axis: AxisType
+    mount_axis: AxisType
     volume: float
     plunger_distance: float
     speed: float
     instr: Pipette
-    current: float
+    plunger_current: float
 
 
 @dataclass(frozen=True)
@@ -472,21 +473,23 @@ class InstrumentHandlerProvider(Generic[MountType]):
         )
         if isinstance(mount, OT3Mount):
             return LiquidActionSpec(
-                axis=OT3Axis.of_main_tool_actuator(mount),
+                plunger_axis=OT3Axis.of_main_tool_actuator(mount),
+                mount_axis=OT3Axis.by_mount(mount),
                 volume=asp_vol,
                 plunger_distance=dist,
                 speed=speed,
                 instr=instrument,
-                current=instrument.config.plunger_current,
+                plunger_current=instrument.config.plunger_current,
             )
         else:
             return LiquidActionSpec(
-                axis=Axis.of_plunger(mount),
+                plunger_axis=Axis.of_plunger(mount),
+                mount_axis=Axis.by_mount(mount),
                 volume=asp_vol,
                 plunger_distance=dist,
                 speed=speed,
                 instr=instrument,
-                current=instrument.config.plunger_current,
+                plunger_current=instrument.config.plunger_current,
             )
 
     @overload
@@ -549,21 +552,23 @@ class InstrumentHandlerProvider(Generic[MountType]):
         )
         if isinstance(mount, top_types.Mount):
             return LiquidActionSpec(
-                axis=Axis.of_plunger(mount),
+                plunger_axis=Axis.of_plunger(mount),
+                mount_axis=Axis.by_mount(mount),
                 volume=disp_vol,
                 plunger_distance=dist,
                 speed=speed,
                 instr=instrument,
-                current=instrument.config.plunger_current,
+                plunger_current=instrument.config.plunger_current,
             )
         else:
             return LiquidActionSpec(
-                axis=OT3Axis.of_main_tool_actuator(mount),
+                plunger_axis=OT3Axis.of_main_tool_actuator(mount),
+                mount_axis=Axis.by_mount(mount),
                 volume=disp_vol,
                 plunger_distance=dist,
                 speed=speed,
                 instr=instrument,
-                current=instrument.config.plunger_current,
+                plunger_current=instrument.config.plunger_current,
             )
 
     @overload
@@ -583,21 +588,23 @@ class InstrumentHandlerProvider(Generic[MountType]):
         )
         if isinstance(mount, top_types.Mount):
             return LiquidActionSpec(
-                axis=Axis.of_plunger(mount),
+                plunger_axis=Axis.of_plunger(mount),
+                mount_axis=Axis.by_mount(mount),
                 volume=0,
                 plunger_distance=instrument.config.blow_out,
                 speed=speed,
                 instr=instrument,
-                current=instrument.config.plunger_current,
+                plunger_current=instrument.config.plunger_current,
             )
         else:
             return LiquidActionSpec(
-                axis=OT3Axis.of_main_tool_actuator(mount),
+                plunger_axis=OT3Axis.of_main_tool_actuator(mount),
+                mount_axis=Axis.by_mount(mount),
                 volume=0,
                 plunger_distance=instrument.config.blow_out,
                 speed=speed,
                 instr=instrument,
-                current=instrument.config.plunger_current,
+                plunger_current=instrument.config.plunger_current,
             )
 
     @staticmethod
