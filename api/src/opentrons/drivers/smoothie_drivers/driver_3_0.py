@@ -1283,6 +1283,14 @@ class SmoothieDriver:
         # cache which axes move because we might take them out of moving target
         moving_axes = list(moving_target.keys())
 
+        # the "target" movement (all axes) should include the
+        # BC backlash coordinate. Then after all axes arrive, apply
+        # just the backlash correction to the BC axes
+        moving_with_backlash_target = moving_target.copy()
+        moving_with_backlash_target.update(backlash_target)
+        backlash_correction_target = {
+            ax: moving_target[ax] for ax in backlash_target.keys() if ax in 'BC'}
+
         def build_split(here: float, dest: float, split_distance: float) -> float:
             """Return the destination for the split move"""
             if dest < here:
@@ -1307,10 +1315,24 @@ class SmoothieDriver:
             # - it's been long enough since the last time it moved
             and ((since_moved[ax] is None) or (split.after_time < since_moved[ax]))  # type: ignore[operator]  # noqa: E501
         }
+        # when splitting a movement, make sure to also split the movement
+        # of other moving axes
+        if split_target:
+            # NOTE: assumes A/B axes are never moving at the same time...
+            if 'A' in split_target:
+                split_ax = 'A'
+            else:
+                split_ax = 'B'
+            dist = backlash_target.get(split_ax, moving_target[split_ax]) - self.position[split_ax]
+            perc_of_total_move = abs(split_target[split_ax] / dist)
+            for ax in moving_axes:
+                dist = backlash_target.get(ax, moving_target[ax]) - self.position[ax]
+                split_dist_on_ax = dist * perc_of_total_move
+                split_target[ax] = split_dist_on_ax
 
         split_command_string = create_coords_list(split_target)
-        primary_command_string = create_coords_list(moving_target)
-        backlash_command_string = create_coords_list(backlash_target)
+        primary_with_backlash_command_string = create_coords_list(moving_with_backlash_target)
+        backlash_correction_command_string = create_coords_list(backlash_correction_target)
 
         self.dwell_axes("".join(non_moving_axes))
         self.activate_axes("".join(moving_axes))
@@ -1365,12 +1387,12 @@ class SmoothieDriver:
         # introduce the standard currents
         command.add_builder(builder=self._generate_current_command())
 
-        if backlash_command_string:
+        command.add_gcode(GCODE.MOVE).add_builder(builder=primary_with_backlash_command_string)
+        if backlash_correction_command_string:
             command.add_gcode(gcode=GCODE.MOVE).add_builder(
-                builder=backlash_command_string
+                builder=backlash_correction_command_string
             )
 
-        command.add_gcode(GCODE.MOVE).add_builder(builder=primary_command_string)
         if checked_speed != self._combined_speed:
             command.add_builder(builder=self._build_speed_command(self._combined_speed))
 
@@ -1379,34 +1401,19 @@ class SmoothieDriver:
         if home_flagged_axes:
             await self.home_flagged_axes("".join(list(target.keys())))
 
-        def _print_test_gcode(cmd: CommandBuilder):
-            ret = str(cmd).strip()
-            cnt = 0
-            for c in str(cmd).strip().split(' '):
-                if c[0] in 'GM':
-                    cnt += 1
-                    ret += f'\n\t{cnt}) '
-                ret += c
-                ret += ' '
-            return ret
-
         async def _do_split() -> None:
             try:
                 for sc in (c for c in (split_prefix, split_command) if c):
-                    print(f"[sc] _send_command: {_print_test_gcode(sc)}")
                     await self._send_command(sc)
             finally:
                 if split_postfix:
-                    print(f"[split_postfix] _send_command: {_print_test_gcode(split_postfix)}")
                     await self._send_command(split_postfix)
 
         try:
             log.debug(f"move: {command}")
             # TODO (hmg) a movement's timeout should be calculated by
             # how long the movement is expected to take.
-            print(target)
             await _do_split()
-            print(f"[command] _send_command: {_print_test_gcode(command)}")
             await self._send_command(command, timeout=DEFAULT_EXECUTE_TIMEOUT)
         finally:
             # dwell pipette motors because they get hot
