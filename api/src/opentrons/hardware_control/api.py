@@ -896,7 +896,7 @@ class API(
         mount: top_types.Mount,
         volume: Optional[float] = None,
         rate: float = 1.0,
-        height_adjust: float = 0.0
+        height_change: float = 0.0
     ) -> None:
         """
         Aspirate a volume of liquid (in microliters/uL) using this pipette.
@@ -909,11 +909,10 @@ class API(
             aspirate_spec.plunger_distance,
             self._current_position,
         )
-        # FIXME: (andy s) should this be added to aspirate_spec?
-        target_pos[Axis.by_mount(mount)] += height_adjust
+        target_pos[Axis.by_mount(mount)] += height_change
         try:
             self._backend.set_active_current(
-                {aspirate_spec.plunger_axis: aspirate_spec.plunger_current}
+                {aspirate_spec.axis: aspirate_spec.current}
             )
             await self._move(
                 target_pos,
@@ -932,7 +931,7 @@ class API(
         mount: top_types.Mount,
         volume: Optional[float] = None,
         rate: float = 1.0,
-        height_adjust: float = 0.0
+        height_change: float = 0.0
     ) -> None:
         """
         Dispense a volume of liquid in microliters(uL) using this pipette.
@@ -945,11 +944,10 @@ class API(
             dispense_spec.plunger_distance,
             self._current_position,
         )
-        # FIXME: (andy s) should this be added to dispense_spec?
-        target_pos[Axis.by_mount(mount)] += height_adjust
+        target_pos[Axis.by_mount(mount)] += height_change
         try:
             self._backend.set_active_current(
-                {dispense_spec.plunger_axis: dispense_spec.plunger_current}
+                {dispense_spec.axis: dispense_spec.current}
             )
             await self._move(
                 target_pos,
