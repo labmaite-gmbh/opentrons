@@ -59,15 +59,15 @@ class InstrumentContextImplementation(AbstractInstrument):
         """Sets the speed at which the robot's gantry moves."""
         self._default_speed = speed
 
-    def aspirate(self, volume: float, rate: float) -> None:
+    def aspirate(self, volume: float, rate: float, height_change: float) -> None:
         """Aspirate a given volume of liquid from the specified location, using
         this pipette."""
-        self._protocol_interface.get_hardware().aspirate(self._mount, volume, rate)
+        self._protocol_interface.get_hardware().aspirate(self._mount, volume, rate, height_change)
 
-    def dispense(self, volume: float, rate: float) -> None:
+    def dispense(self, volume: float, rate: float, height_change: float) -> None:
         """Dispense a volume of liquid (in microliters/uL) using this pipette
         into the specified location."""
-        self._protocol_interface.get_hardware().dispense(self._mount, volume, rate)
+        self._protocol_interface.get_hardware().dispense(self._mount, volume, rate, height_change)
 
     def blow_out(self) -> None:
         """Blow liquid out of the tip."""

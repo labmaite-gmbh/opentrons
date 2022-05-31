@@ -968,7 +968,7 @@ class API(
         """
         blowout_spec = self.plan_check_blow_out(mount)
         self._backend.set_active_current(
-            {blowout_spec.plunger_axis: blowout_spec.plunger_current})
+            {blowout_spec.axis: blowout_spec.current})
         target_pos = target_position_from_plunger(
             mount,
             blowout_spec.plunger_distance,
