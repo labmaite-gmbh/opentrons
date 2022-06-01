@@ -917,6 +917,7 @@ class API(
             await self._move(
                 target_pos,
                 speed=aspirate_spec.speed,
+                max_speeds={aspirate_spec.axis: aspirate_spec.speed},
                 home_flagged_axes=False,
             )
         except Exception:
@@ -952,6 +953,7 @@ class API(
             await self._move(
                 target_pos,
                 speed=dispense_spec.speed,
+                max_speeds={dispense_spec.axis: dispense_spec.speed},
                 home_flagged_axes=False,
             )
         except Exception:
