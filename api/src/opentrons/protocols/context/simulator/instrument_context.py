@@ -47,7 +47,7 @@ class InstrumentContextSimulation(AbstractInstrument):
     def set_default_speed(self, speed: float) -> None:
         self._default_speed = speed
 
-    def aspirate(self, volume: float, rate: float, height_change: float) -> None:
+    def aspirate(self, volume: float, rate: float) -> None:
         self._raise_if_no_tip(HardwareAction.ASPIRATE.name)
         new_volume = self.get_current_volume() + volume
         assert (
@@ -56,7 +56,7 @@ class InstrumentContextSimulation(AbstractInstrument):
         self._pipette_dict["ready_to_aspirate"] = True
         self._update_volume(new_volume)
 
-    def dispense(self, volume: float, rate: float, height_change: float) -> None:
+    def dispense(self, volume: float, rate: float) -> None:
         self._raise_if_no_tip(HardwareAction.DISPENSE.name)
         self._update_volume(self.get_current_volume() - volume)
 

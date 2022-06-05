@@ -134,7 +134,6 @@ class InstrumentContext(CommandPublisher):
         volume: Optional[float] = None,
         location: Optional[Union[types.Location, Well]] = None,
         rate: float = 1.0,
-        height_change: float = 0.0
     ) -> InstrumentContext:
         """
         Aspirate a given volume of liquid from the specified location, using
@@ -233,7 +232,7 @@ class InstrumentContext(CommandPublisher):
                 rate=rate,
             ),
         ):
-            self._implementation.aspirate(volume=c_vol, rate=rate, height_change=height_change)
+            self._implementation.aspirate(volume=c_vol, rate=rate)
 
         return self
 
@@ -243,7 +242,6 @@ class InstrumentContext(CommandPublisher):
         volume: Optional[float] = None,
         location: Optional[Union[types.Location, Well]] = None,
         rate: float = 1.0,
-        height_change: float = 0.0
     ) -> InstrumentContext:
         """
         Dispense a volume of liquid (in microliters/uL) using this pipette
@@ -328,7 +326,7 @@ class InstrumentContext(CommandPublisher):
                 rate=rate,
             ),
         ):
-            self._implementation.dispense(volume=c_vol, rate=rate, height_change=height_change)
+            self._implementation.dispense(volume=c_vol, rate=rate)
 
         return self
 

@@ -144,9 +144,6 @@ class Controller:
                 return False
         return True
 
-    async def limit_switch_state(self) -> Dict[str, bool]:
-        return await self._smoothie_driver.switch_state()
-
     async def move(
         self,
         target_position: Dict[str, float],
@@ -327,16 +324,6 @@ class Controller:
     async def probe(self, axis: str, distance: float) -> Dict[str, float]:
         """Run a probe and return the new position dict"""
         return await self._smoothie_driver.probe_axis(axis, distance)
-
-    async def probe_instrument(self, mount: Mount, axis: Axis, distance: float, speed: float) -> Dict[str, float]:
-        """Run a probe using a pipette endstop (L or R), and return the new position dict"""
-        if mount == Mount.LEFT:
-            instrument = 'L'
-        elif mount == Mount.RIGHT:
-            instrument = 'R'
-        else:
-            raise ValueError(f'Unexpected mount in probe_instrument {mount}')
-        return await self._smoothie_driver.probe_instrument(instrument, str(axis).upper(), distance, speed)
 
     async def clean_up(self) -> None:
         try:

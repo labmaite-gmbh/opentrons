@@ -21,11 +21,11 @@ class AbstractInstrument(ABC):
         ...
 
     @abstractmethod
-    def aspirate(self, volume: float, rate: float, height_change: float) -> None:
+    def aspirate(self, volume: float, rate: float) -> None:
         ...
 
     @abstractmethod
-    def dispense(self, volume: float, rate: float, height_change: float) -> None:
+    def dispense(self, volume: float, rate: float) -> None:
         ...
 
     @abstractmethod

@@ -895,7 +895,6 @@ class OT3API(
         mount: Union[top_types.Mount, OT3Mount],
         volume: Optional[float] = None,
         rate: float = 1.0,
-        height_change: float = 1.0,
     ) -> None:
         """
         Aspirate a volume of liquid (in microliters/uL) using this pipette."""
@@ -910,7 +909,6 @@ class OT3API(
             aspirate_spec.plunger_distance,
             self._current_position,
         )
-        target_pos[OT3Axis.by_mount(realmount)] += height_change
 
         try:
             await self._backend.set_active_current(
@@ -934,7 +932,6 @@ class OT3API(
         mount: Union[top_types.Mount, OT3Mount],
         volume: Optional[float] = None,
         rate: float = 1.0,
-        height_change: float = 0.0,
     ) -> None:
         """
         Dispense a volume of liquid in microliters(uL) using this pipette."""
@@ -949,7 +946,6 @@ class OT3API(
             dispense_spec.plunger_distance,
             self._current_position,
         )
-        target_pos[OT3Axis.by_mount(realmount)] += height_change
 
         try:
             await self._backend.set_active_current(

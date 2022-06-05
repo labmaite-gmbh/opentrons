@@ -937,6 +937,7 @@ class API(
         """
         Dispense a volume of liquid in microliters(uL) using this pipette.
         """
+
         dispense_spec = self.plan_check_dispense(mount, volume, rate)
         if not dispense_spec:
             return
@@ -945,6 +946,7 @@ class API(
             dispense_spec.plunger_distance,
             self._current_position,
         )
+        
         target_pos[Axis.by_mount(mount)] += height_change
         try:
             self._backend.set_active_current(
@@ -969,8 +971,7 @@ class API(
         the current location of pipette
         """
         blowout_spec = self.plan_check_blow_out(mount)
-        self._backend.set_active_current(
-            {blowout_spec.axis: blowout_spec.current})
+        self._backend.set_active_current({blowout_spec.axis: blowout_spec.current})
         target_pos = target_position_from_plunger(
             mount,
             blowout_spec.plunger_distance,
