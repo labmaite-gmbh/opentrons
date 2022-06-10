@@ -159,6 +159,7 @@ export function UpdateAppModal(props: UpdateAppModalProps): JSX.Element {
     <BaseModal
       overlayColor="#737373e6"
       maxWidth="38rem"
+      maxHeight="28.125rem"
       fontSize={FONT_SIZE_BODY_2}
       header={
         <Text
