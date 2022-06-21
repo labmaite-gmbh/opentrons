@@ -18,7 +18,13 @@ from . import magnetic_module
 from . import temperature_module
 from . import thermocycler
 
-from .command import AbstractCommandImpl, BaseCommand, BaseCommandCreate, CommandStatus
+from .command import (
+    AbstractCommandImpl,
+    BaseCommand,
+    BaseCommandCreate,
+    CommandStatus,
+    CommandIntent,
+)
 
 from .command_unions import (
     Command,
@@ -99,6 +105,14 @@ from .move_relative import (
     MoveRelativeCommandType,
 )
 
+from .move_to_coordinates import (
+    MoveToCoordinates,
+    MoveToCoordinatesParams,
+    MoveToCoordinatesCreate,
+    MoveToCoordinatesResult,
+    MoveToCoordinatesCommandType,
+)
+
 from .move_to_well import (
     MoveToWell,
     MoveToWellParams,
@@ -139,6 +153,21 @@ from .set_rail_lights import (
     SetRailLightsCommandType,
 )
 
+from .touch_tip import (
+    TouchTip,
+    TouchTipParams,
+    TouchTipCreate,
+    TouchTipResult,
+    TouchTipCommandType,
+)
+
+from .blow_out import (
+    BlowOutParams,
+    BlowOutResult,
+    BlowOutCreate,
+    BlowOutImplementation,
+    BlowOut,
+)
 
 __all__ = [
     # command type unions
@@ -152,6 +181,7 @@ __all__ = [
     "BaseCommand",
     "BaseCommandCreate",
     "CommandStatus",
+    "CommandIntent",
     # aspirate command models
     "Aspirate",
     "AspirateCreate",
@@ -205,6 +235,12 @@ __all__ = [
     "MoveRelativeCreate",
     "MoveRelativeResult",
     "MoveRelativeCommandType",
+    # move to coordinates command models
+    "MoveToCoordinates",
+    "MoveToCoordinatesParams",
+    "MoveToCoordinatesCreate",
+    "MoveToCoordinatesResult",
+    "MoveToCoordinatesCommandType",
     # move to well command models
     "MoveToWell",
     "MoveToWellCreate",
@@ -235,6 +271,18 @@ __all__ = [
     "SetRailLightsCreate",
     "SetRailLightsResult",
     "SetRailLightsCommandType",
+    # touch tip command models
+    "TouchTip",
+    "TouchTipParams",
+    "TouchTipCreate",
+    "TouchTipResult",
+    "TouchTipCommandType",
+    # blow out command models
+    "BlowOutResult",
+    "BlowOutCreate",
+    "BlowOutImplementation",
+    "BlowOutParams",
+    "BlowOut",
     # module command bundles
     "heater_shaker",
     "magnetic_module",

@@ -154,6 +154,44 @@ class SyncClient:
         result = self._transport.execute_command(request=request)
         return cast(commands.DispenseResult, result)
 
+    def blow_out(
+        self,
+        pipette_id: str,
+        labware_id: str,
+        well_name: str,
+        well_location: WellLocation,
+    ) -> commands.BlowOutResult:
+        """Execute a ``BlowOut`` command and return the result."""
+        request = commands.BlowOutCreate(
+            params=commands.BlowOutParams(
+                pipetteId=pipette_id,
+                labwareId=labware_id,
+                wellName=well_name,
+                wellLocation=well_location,
+            )
+        )
+        result = self._transport.execute_command(request=request)
+        return cast(commands.BlowOutResult, result)
+
+    def touch_tip(
+        self,
+        pipette_id: str,
+        labware_id: str,
+        well_name: str,
+        well_location: WellLocation,
+    ) -> commands.TouchTipResult:
+        """Execute a ``Touch Tip`` command and return the result."""
+        request = commands.TouchTipCreate(
+            params=commands.TouchTipParams(
+                pipetteId=pipette_id,
+                labwareId=labware_id,
+                wellName=well_name,
+                wellLocation=well_location,
+            )
+        )
+        result = self._transport.execute_command(request=request)
+        return cast(commands.TouchTipResult, result)
+
     def pause(self, message: Optional[str]) -> commands.PauseResult:
         """Execute a ``Pause`` command and return the result."""
         request = commands.PauseCreate(params=commands.PauseParams(message=message))
@@ -199,3 +237,23 @@ class SyncClient:
         )
         result = self._transport.execute_command(request=request)
         return cast(commands.thermocycler.DeactivateLidResult, result)
+
+    def thermocycler_open_lid(
+        self, module_id: str
+    ) -> commands.thermocycler.OpenLidResult:
+        """Execute a `thermocycler/openLid` command and return the result."""
+        request = commands.thermocycler.OpenLidCreate(
+            params=commands.thermocycler.OpenLidParams(moduleId=module_id)
+        )
+        result = self._transport.execute_command(request=request)
+        return cast(commands.thermocycler.OpenLidResult, result)
+
+    def thermocycler_close_lid(
+        self, module_id: str
+    ) -> commands.thermocycler.CloseLidResult:
+        """Execute a `thermocycler/closeLid` command and return the result."""
+        request = commands.thermocycler.CloseLidCreate(
+            params=commands.thermocycler.CloseLidParams(moduleId=module_id)
+        )
+        result = self._transport.execute_command(request=request)
+        return cast(commands.thermocycler.CloseLidResult, result)
