@@ -1,0 +1,95 @@
+name: app-testing-windows-wd
+on:
+  workflow_dispatch:
+    inputs:
+      appimage-url:
+        description: "Opentrons exe URL."
+        required: true
+        default: "https://s3.amazonaws.com/opentrons-app/builds/Opentrons-v6.0.0-win-b20264.exe"
+      electron-version:
+        description: "Electron version."
+        required: true
+        default: "13.1.8"
+      command:
+        description: "Command to Run."
+        required: true
+        default: "pytest --collect-only"
+
+jobs:
+  test:
+    env:
+      PIPENV_VENV_IN_PROJECT: 1
+    timeout-minutes: 10
+    runs-on: "windows-2022"
+    steps:
+      - uses: "actions/setup-python@v4"
+        with:
+          python-version: "3.10"
+
+      - name: Install pipenv
+        run: |
+          pip install pipenv==2022.3.24
+
+      - name: Checkout opentrons-emulation
+        uses: actions/checkout@v3
+        with:
+          repository: "Opentrons/opentrons-emulation"
+          ref: 553b592
+          path: emulation
+
+      - name: build and run emulation
+        working-directory: ${{ github.workspace }}/emulation
+        run:  |
+          docker-compose up
+
+      - name: Checkout opentrons
+        uses: actions/checkout@v3
+        with:
+          path: opentrons
+
+      # - name: Cache Testing Dependencies
+      #   uses: actions/cache@v3
+      #   id: cache-test-dependencies
+      #   with:
+      #     path: ./opentrons/app-testing/.venv
+      #     key: ${{ runner.os }}-pipenv-${{ hashFiles('./opentrons/app-testing/Pipfile.lock') }}
+
+      # - name: Setup app-testing
+      #   id: install
+      #   if: steps.cache-test-dependencies.outputs.cache-hit != 'true'
+      #   working-directory: ./opentrons/app-testing
+      #   run: make setup
+
+      # - name: Get Opentrons EXE and Install
+      #   run: |
+      #     $filename="${{ github.event.inputs.exe-url }}"
+      #     $filename=$filename.split("/")[-1]
+      #     Invoke-WebRequest -Uri ${{ github.event.inputs.exe-url }} -OutFile $filename
+      #     $prm='/S'
+      #     & ./$filename $prm
+      #     $sh = New-Object -ComObject WScript.Shell
+      #     $executable_path = $sh.CreateShortcut('~/Desktop/Opentrons.lnk').TargetPath
+      #     echo $executable_path
+      #     echo $(Test-Path $executable_path)
+      #     echo "EXECUTABLE_PATH=${executable_path}" >> $Env:GITHUB_ENV
+
+      # - name: Install Chromedriver on the path.
+      #   working-directory: ./opentrons/app-testing
+      #   run: |
+      #     ./ci-tools/windows_get_chromedriver.ps1 ${{ github.event.inputs.chromedriver-version }}
+      #     chromedriver --version
+
+      # - name: Run Tests.
+      #   working-directory: ./opentrons/app-testing
+      #   run: |
+      #     Set-Item -Path Env:ROBOT_BASE_URL -Value "http://127.0.0.1:31950"
+      #     chromedriver --url-base=/wd/hub &
+      #     pipenv run ${{ env.COMMAND }}
+
+      # - name: Upload pytest test results.
+      #   uses: actions/upload-artifact@v2
+      #   with:
+      #     name: pytest-results
+      #     path: opentrons/app-testing/results/results.xml
+      #   # Use always() to always run this step to publish test results when there are test failures
+      #   if: ${{ always() }}

@@ -36,34 +36,8 @@ Slices of the tests will be selected as candidates for automation and then perfo
 7. Run all tests
    1. `make test`
 8. Run specific test(s)
-   1. `pipenv run python -m pytest -k test_initial_load_no_robot`
+   1. `pipenv run python -m pytest -k test_labware_landing`
       1. [See docs on pytest -k flag](https://docs.pytest.org/en/6.2.x/usage.html#specifying-tests-selecting-tests)
-
-## Possible ToDo
-
-- Once there is a mass of tests to see the patterns to abstract:
-  - Abstract env variables and config file setup into data structures and functions instead of inline?
-  - Extend or change the reporting output?
-- Mac and Windows github action runners?
-- Caching in github action runners?
-- Add the option/capability to 'build and install' instead of 'download and install' on runners.
-- Define steps for a VM/docker locally for linux runs?
-- Define steps for a VM locally for windows runs?
-- Better injection of dependencies to relieve import bloat?
-- Test case objects describing setup, "test data", test case meta data for tracking?
-- Test execution history into DataDog
-
-## commands
-
-use xdist
-`pipenv run pytest -n3`
-
-run black
-`make format`
-`make black`
-
-run lint
-`make lint`
 
 ## Tools
 
@@ -75,6 +49,8 @@ python 3.10.2 - manage python with [pyenv](https://realpython.com/intro-to-pyenv
 Using the python REPL we can launch the app and in real time compose element locator strategies.
 Then we can execute them, proving they work.
 This alleviates having to run tests over and over to validate element locator strategies.
+
+> Using this tool is imperative to reduce time of development when creating/troubleshooting element locators.
 
 From the app-testing directory
 
@@ -88,3 +64,28 @@ pipenv run python -i locators.py
 
 > sometimes chromedriver does not cleanly exit.
 > `pkill -x chromedriver`
+
+## Emulation
+
+We have made the choice to setup all test runs local and in CI against this emulator [config](./ci-tools/ot2_with_all_modules.yaml)
+
+To use locally setup the [emulator](https://github.com/Opentrons/opentrons-emulation)
+
+run our expected config
+
+```shell
+make run file_path=$MONOREPOPATH/app-testing/ci-tools/ot2_with_all_modules.yaml
+```
+
+ctrl-c to stop
+
+remove the containers (this resets calibration, stopping them does not)
+
+```shell
+make remove file_path=$MONOREPOPATH/app-testing/ci-tools/ot2_with_all_modules.yaml
+```
+
+## Gotchas
+
+- Only have 1 robot connected at once.
+  - Build locators like you have more than 1 to future proof.
