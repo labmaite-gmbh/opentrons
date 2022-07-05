@@ -213,7 +213,7 @@ export function SetupLabware({
               modulesInfo={moduleRenderInfoById}
             />
           ) : null}
-          <Box size="80%">
+          <Box size="80%" marginX="auto">
             <RobotWorkSpace
               deckDef={(standardDeckDef as unknown) as DeckDefinition}
               viewBox={DECK_MAP_VIEWBOX}
