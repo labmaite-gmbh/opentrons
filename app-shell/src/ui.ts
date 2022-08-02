@@ -6,6 +6,7 @@ import { createLogger } from './log'
 
 const config = getConfig('ui')
 const log = createLogger('ui')
+const isOnDevice = getConfig().isOnDevice
 
 const urlPath =
   config.url.protocol === 'file:'
@@ -20,6 +21,7 @@ const WINDOW_OPTS = {
   width: config.width,
   minWidth: config.minWidth,
   height: config.height,
+  frame: !isOnDevice,
   // allow webPreferences to be set at launchtime from config
   webPreferences: Object.assign(
     {
