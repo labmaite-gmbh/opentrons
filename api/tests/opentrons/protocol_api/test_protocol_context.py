@@ -1,7 +1,7 @@
 import pytest
 from decoy import Decoy
 
-from opentrons.protocol_api import ProtocolContext
+from opentrons.protocol_api import MAX_SUPPORTED_VERSION, APIVersion, ProtocolContext
 from opentrons.protocol_api._core import (
     AbstractProtocolCore as ProtocolCore,
     AbstractLabwareCore as LabwareCore,
@@ -24,6 +24,15 @@ def labware_core(decoy: Decoy) -> LabwareCore:
 def subject(core: ProtocolCore) -> ProtocolContext:
     """Get a ProtocolContext test subject with its dependencies mocked out."""
     return ProtocolContext(core=core)
+
+
+def test_api_version(core: ProtocolCore) -> None:
+    """It should have an API version."""
+    subject = ProtocolContext(core=core, api_version=None)
+    assert subject.api_version == MAX_SUPPORTED_VERSION
+
+    subject = ProtocolContext(core=core, api_version=APIVersion(2, 0))
+    assert subject.api_version == APIVersion(2, 0)
 
 
 def test_load_labware(

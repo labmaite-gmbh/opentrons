@@ -91,55 +91,51 @@ class ProtocolContext(CommandPublisher):
 
     """
 
-    def __init__(self, core: AbstractProtocolCore) -> None:
-        self._core = core
-        self._api_version = MAX_SUPPORTED_VERSION
+    def __init__(
+        self,
+        implementation: AbstractProtocol,
+        labware_offset_provider: Optional[AbstractLabwareOffsetProvider] = None,
+        loop: Optional[asyncio.AbstractEventLoop] = None,
+        broker: Optional[Broker] = None,
+        api_version: Optional[APIVersion] = None,
+    ) -> None:
+        """Build a :py:class:`.ProtocolContext`.
 
-    # def __init__(
-    #     self,
-    #     implementation: AbstractProtocol,
-    #     labware_offset_provider: Optional[AbstractLabwareOffsetProvider] = None,
-    #     loop: Optional[asyncio.AbstractEventLoop] = None,
-    #     broker: Optional[Broker] = None,
-    #     api_version: Optional[APIVersion] = None,
-    # ) -> None:
-    #     """Build a :py:class:`.ProtocolContext`.
+        :param labware_offset_provider: Where this protocol context and its child
+                                        module contexts will get labware offsets from.
+        :param loop: An event loop to use. If not specified, this ctor will
+                     (eventually) call :py:meth:`asyncio.get_event_loop`.
+        :param broker: An optional command broker to link to. If not
+                      specified, a dummy one is used.
+        :param api_version: The API version to use. If this is ``None``, uses
+                            the max supported version.
+        """
+        super().__init__(broker)
 
-    #     :param labware_offset_provider: Where this protocol context and its child
-    #                                     module contexts will get labware offsets from.
-    #     :param loop: An event loop to use. If not specified, this ctor will
-    #                  (eventually) call :py:meth:`asyncio.get_event_loop`.
-    #     :param broker: An optional command broker to link to. If not
-    #                   specified, a dummy one is used.
-    #     :param api_version: The API version to use. If this is ``None``, uses
-    #                         the max supported version.
-    #     """
-    #     super().__init__(broker)
+        self._implementation = implementation
 
-    #     self._implementation = implementation
+        self._labware_offset_provider = (
+            labware_offset_provider or NullLabwareOffsetProvider()
+        )
 
-    #     self._labware_offset_provider = (
-    #         labware_offset_provider or NullLabwareOffsetProvider()
-    #     )
+        self._api_version = api_version or MAX_SUPPORTED_VERSION
+        if self._api_version > MAX_SUPPORTED_VERSION:
+            raise RuntimeError(
+                f"API version {self._api_version} is not supported by this "
+                f"robot software. Please either reduce your requested API "
+                f"version or update your robot."
+            )
+        self._loop = loop or asyncio.get_event_loop()
+        self._instruments: Dict[types.Mount, Optional[InstrumentContext]] = {
+            mount: None for mount in types.Mount
+        }
+        self._modules: List[ModuleTypes] = []
 
-    #     self._api_version = api_version or MAX_SUPPORTED_VERSION
-    #     if self._api_version > MAX_SUPPORTED_VERSION:
-    #         raise RuntimeError(
-    #             f"API version {self._api_version} is not supported by this "
-    #             f"robot software. Please either reduce your requested API "
-    #             f"version or update your robot."
-    #         )
-    #     self._loop = loop or asyncio.get_event_loop()
-    #     self._instruments: Dict[types.Mount, Optional[InstrumentContext]] = {
-    #         mount: None for mount in types.Mount
-    #     }
-    #     self._modules: List[ModuleTypes] = []
+        self._commands: List[str] = []
+        self._unsubscribe_commands: Optional[Callable[[], None]] = None
+        self.clear_commands()
 
-    #     self._commands: List[str] = []
-    #     self._unsubscribe_commands: Optional[Callable[[], None]] = None
-    #     self.clear_commands()
-
-    #     self._equipment_broker = EquipmentBroker[LoadInfo]()
+        self._equipment_broker = EquipmentBroker[LoadInfo]()
 
     @property
     def equipment_broker(self) -> EquipmentBroker[LoadInfo]:

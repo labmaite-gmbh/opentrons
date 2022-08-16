@@ -4,6 +4,8 @@ This package defines classes and functions for access through a protocol to
 control the OT2.
 
 """
+
+from opentrons.protocols.api_support.types import APIVersion
 from opentrons.protocols.api_support.definitions import (
     MAX_SUPPORTED_VERSION,
     MIN_SUPPORTED_VERSION,
@@ -21,6 +23,7 @@ from .contexts import (
 __all__ = [
     "MAX_SUPPORTED_VERSION",
     "MIN_SUPPORTED_VERSION",
+    "APIVersion",
     "ProtocolContext",
     "InstrumentContext",
     "TemperatureModuleContext",
