@@ -4,6 +4,7 @@ const path = require('path')
 const { OT_APP_DEPLOY_BUCKET, OT_APP_DEPLOY_FOLDER } = process.env
 const DEV_MODE = process.env.NODE_ENV !== 'production'
 const USE_PYTHON = process.env.NO_PYTHON !== 'true'
+const ARM64 = process.env.ARM64 === 'true'
 
 module.exports = {
   appId: 'com.opentrons.app',
@@ -43,6 +44,7 @@ module.exports = {
     target: ['AppImage'],
     executableName: 'opentrons',
     category: 'Science',
+    files: ARM64 ? ['!node_modules/usb-detection'] : [],
   },
   publish:
     OT_APP_DEPLOY_BUCKET && OT_APP_DEPLOY_FOLDER
