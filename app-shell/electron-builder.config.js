@@ -19,6 +19,7 @@ module.exports = {
     'build/br-premigration-wheels',
     '!Makefile',
     '!python',
+    ARM64 ? '!node_modules/usb-detection' : '',
   ],
   extraResources: USE_PYTHON ? ['python'] : [],
   /* eslint-disable no-template-curly-in-string */
@@ -44,7 +45,6 @@ module.exports = {
     target: ['AppImage'],
     executableName: 'opentrons',
     category: 'Science',
-    files: ARM64 ? ['!node_modules/usb-detection'] : [],
   },
   publish:
     OT_APP_DEPLOY_BUCKET && OT_APP_DEPLOY_FOLDER
