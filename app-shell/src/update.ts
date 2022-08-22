@@ -47,9 +47,9 @@ function checkUpdate(dispatch: Dispatch): void {
   updater.once('error', onError)
 
   // @ts-expect-error(mc, 2021-02-16): do not use dot-path notation
-  updater.channel = getConfig('update.channel')
+  // updater.channel = getConfig('update.channel')
   // eslint-disable-next-line @typescript-eslint/no-floating-promises
-  updater.checkForUpdates()
+  // updater.checkForUpdates()
 
   function done(payload: {
     info?: UpdateInfo

@@ -33,6 +33,9 @@ log.debug('App config', {
   overrides: getOverrides(),
 })
 
+// tmp
+app.commandLine.appendSwitch('touch-events', 'enabled')
+
 if (config.devtools) {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   require('electron-debug')({ isEnabled: true, showDevTools: true })
