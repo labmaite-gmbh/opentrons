@@ -467,6 +467,10 @@ class NoTipAttachedError(RuntimeError):
     pass
 
 
+class NotReadyToAspirateError(RuntimeError):
+    pass
+
+
 class TipAttachedError(RuntimeError):
     pass
 

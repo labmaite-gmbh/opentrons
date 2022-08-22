@@ -221,6 +221,28 @@ class PipettingHandler:
             current_well=current_well,
         )
 
+        self.aspirate_in_place
+
+        with self.set_flow_rate(pipette=hw_pipette, aspirate_flow_rate=flow_rate):
+            await self._hardware_api.aspirate(mount=hw_pipette.mount, volume=volume)
+
+        return volume
+
+    async def aspirate_in_place(
+    ) -> float:
+        hw_pipette = self._state_store.pipettes.get_hardware_pipette(
+            pipette_id=pipette_id,
+            attached_pipettes=self._hardware_api.attached_instruments,
+        )
+
+        ready_to_aspirate = self._state_store.pipettes.get_is_ready_to_aspirate(
+            pipette_id=pipette_id,
+            pipette_config=hw_pipette.config,
+        )
+
+        if not ready_to_aspirate:
+            raise RuntimeError()  # TODO: Flesh out exception.
+
         with self.set_flow_rate(pipette=hw_pipette, aspirate_flow_rate=flow_rate):
             await self._hardware_api.aspirate(mount=hw_pipette.mount, volume=volume)
 

@@ -34,16 +34,22 @@ class AspirateResult(BaseLiquidHandlingResult):
 class AspirateImplementation(AbstractCommandImpl[AspirateParams, AspirateResult]):
     """Aspirate command implementation."""
 
-    def __init__(self, pipetting: PipettingHandler, **kwargs: object) -> None:
+    def __init__(
+        self, movement: MovementHandler, pipetting: PipettingHandler, **kwargs: object
+    ) -> None:
+        self._movement = movement
         self._pipetting = pipetting
 
     async def execute(self, params: AspirateParams) -> AspirateResult:
         """Move to and aspirate from the requested well."""
-        volume = await self._pipetting.aspirate(
+        await self._movement.move_to_well(
             pipette_id=params.pipetteId,
             labware_id=params.labwareId,
             well_name=params.wellName,
             well_location=params.wellLocation,
+        )
+        volume = await self._pipetting.aspirate_in_place(
+            pipette_id=params.pipetteId,
             volume=params.volume,
             flow_rate=params.flowRate,
         )
