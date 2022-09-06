@@ -1,5 +1,6 @@
 import sys
 import datetime
+import enum
 
 sys.path.append("/opt/opentrons-robot-server")
 
@@ -22,6 +23,13 @@ class InvalidInput(Exception):
     """Invalid input exception."""
 
     pass
+
+
+class GripperState(enum.Enum):
+    UNGRIPPING = enum.auto()
+    GRIPPING = enum.auto()
+    Z_HOMED = enum.auto()
+    Z_LOWERED = enum.auto()
 
 
 def prompt_int_input(prompt_name: str) -> int:
@@ -73,6 +81,7 @@ def print_current_state(
     api: ThreadManager[HardwareControlAPI],
     cycle_index: int,
     slot: int,
+    jaw_state: GripperState,
 ) -> None:
     """
     1. timestamp
@@ -91,7 +100,7 @@ def print_current_state(
     enc_loc = (enc_pos[OT3Axis.X], enc_pos[OT3Axis.Y], enc_pos[OT3Axis.G])
     print(
         f"{datetime.datetime.now()}, {cycle_index}, {slot}, "
-        f"{gripper_loc}, {gripper.state}, {enc_loc}\n"
+        f"{gripper_loc}, {jaw_state}, {enc_loc}\n"
     )
 
 
@@ -120,44 +129,50 @@ if __name__ == "__main__":
     for cycle in range(repeats + 1):
         # move to pick up position at origin slot
         api.move_to(MOUNT, from_slot_loc._replace(z=homed_pos.z))
+        print_current_state(hc_api, cycle, from_slot, GripperState.Z_HOMED)
         api.move_to(MOUNT, from_slot_loc._replace(z=grip_height))
-        print_current_state(hc_api, cycle, from_slot)
+        print_current_state(hc_api, cycle, from_slot, GripperState.Z_LOWERED)
 
         api.grip(grip_force)
         api.delay(1)
-        print_current_state(hc_api, cycle, from_slot)
+        print_current_state(hc_api, cycle, from_slot, GripperState.GRIPPING)
 
         # move to drop off position at destination slot
         api.move_to(MOUNT, from_slot_loc._replace(z=homed_pos.z))
+        print_current_state(hc_api, cycle, from_slot, GripperState.Z_HOMED)
         api.move_to(MOUNT, to_slot_loc._replace(z=homed_pos.z))
+        print_current_state(hc_api, cycle, to_slot, GripperState.Z_HOMED)
         api.move_to(MOUNT, to_slot_loc._replace(z=grip_height))
-        print_current_state(hc_api, cycle, from_slot)
+        print_current_state(hc_api, cycle, to_slot, GripperState.Z_LOWERED)
 
         api.ungrip()
         api.delay(1)
-        print_current_state(hc_api, cycle, from_slot)
+        print_current_state(hc_api, cycle, to_slot, GripperState.UNGRIPPING)
 
         api.move_to(MOUNT, to_slot_loc._replace(z=homed_pos.z))
+        print_current_state(hc_api, cycle, to_slot, GripperState.Z_HOMED)
 
         if return_to_origin:
             api.move_to(MOUNT, to_slot_loc._replace(z=grip_height))
-            print_current_state(hc_api, cycle, from_slot)
+            print_current_state(hc_api, cycle, to_slot, GripperState.Z_LOWERED)
 
             api.grip(grip_force)
             api.delay(1.0)
-            print_current_state(hc_api, cycle, from_slot)
+            print_current_state(hc_api, cycle, to_slot, GripperState.GRIPPING)
 
             api.move_to(MOUNT, to_slot_loc._replace(z=homed_pos.z))
+            print_current_state(hc_api, cycle, to_slot, GripperState.Z_HOMED)
             api.move_to(MOUNT, from_slot_loc._replace(z=homed_pos.z))
+            print_current_state(hc_api, cycle, from_slot, GripperState.Z_HOMED)
             api.move_to(MOUNT, from_slot_loc._replace(z=grip_height))
-            print_current_state(hc_api, cycle, from_slot)
+            print_current_state(hc_api, cycle, from_slot, GripperState.Z_LOWERED)
 
             api.ungrip()
             api.delay(1.0)
-            print_current_state(hc_api, cycle, from_slot)
+            print_current_state(hc_api, cycle, from_slot, GripperState.UNGRIPPING)
 
             # Return to safe height
             api.move_to(MOUNT, from_slot_loc._replace(z=homed_pos.z))
-            print_current_state(hc_api, cycle, from_slot)
+            print_current_state(hc_api, cycle, from_slot, GripperState.Z_HOMED)
 
     api.home()
