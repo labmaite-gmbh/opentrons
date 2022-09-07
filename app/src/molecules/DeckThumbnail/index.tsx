@@ -2,12 +2,13 @@ import * as React from 'react'
 import map from 'lodash/map'
 
 import { RobotWorkSpace, Module, LabwareRender } from '@opentrons/components'
-import { getDeckDefinitions } from '@opentrons/components/src/hardware-sim/Deck/getDeckDefinitions'
 import { useFeatureFlag } from '../../redux/config'
 
 import {
   inferModuleOrientationFromXCoordinate,
   getModuleDef2,
+  getDeckDefFromLoadedLabware,
+  getRobotTypeFromLoadedLabware,
   THERMOCYCLER_MODULE_V1,
 } from '@opentrons/shared-data'
 import {
@@ -17,11 +18,15 @@ import {
   parseLiquidsInLoadOrder,
   parseLabwareInfoByLiquidId,
 } from '@opentrons/api-client'
-import { getWellFillFromLabwareId } from '../../organisms/Devices/ProtocolRun/SetupLiquids/utils'
-import type { DeckSlot, RunTimeCommand } from '@opentrons/shared-data'
+import type {
+  DeckSlot,
+  LoadedLabware,
+  RunTimeCommand,
+} from '@opentrons/shared-data'
 
 interface DeckThumbnailProps {
   commands: RunTimeCommand[]
+  labware: LoadedLabware[]
   showLiquids?: boolean
 }
 const deckSetupLayerBlocklist = [
@@ -35,8 +40,9 @@ const deckSetupLayerBlocklist = [
 ]
 
 export function DeckThumbnail(props: DeckThumbnailProps): JSX.Element {
-  const deckDef = React.useMemo(() => getDeckDefinitions().ot2_standard, [])
-  const { commands, showLiquids } = props
+  const { commands, labware, showLiquids } = props
+  const robotType = getRobotTypeFromLoadedLabware(labware)
+  const deckDef = getDeckDefFromLoadedLabware(robotType)
   const liquidSetupEnabled = useFeatureFlag('enableLiquidSetup')
 
   const initialLoadedLabwareBySlot = parseInitialLoadedLabwareBySlot(commands)
