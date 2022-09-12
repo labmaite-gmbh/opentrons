@@ -77,7 +77,7 @@ async def update_serial_and_confirm(
     """Update and verify the update of serial data."""
     for attempt in range(attempts):
         serial_bytes = serials.gripper_serial_val_from_parts(model, data)
-        base_log.debug(
+        trace_log.info(
             f"beginning set and confirm attempt {attempt} with bytes {serial_bytes!r}"
         )
         set_message = message_definitions.SetSerialNumber(
@@ -87,7 +87,7 @@ async def update_serial_and_confirm(
         )
         await messenger.send(NodeId.gripper, set_message)
 
-        base_log.debug(f"Sent set-serial: {set_message}")
+        trace_log.info(f"Sent set-serial: {set_message}")
         await messenger.send(
             NodeId.gripper, message_definitions.InstrumentInfoRequest()
         )
@@ -99,9 +99,10 @@ async def update_serial_and_confirm(
                         wc.read(), (target - datetime.datetime.now()).total_seconds()
                     )
                     if (
-                        isinstance(message, message_definitions.PipetteInfoResponse)
+                        isinstance(message, message_definitions.GripperInfoResponse)
                         and arb.parts.originating_node_id == NodeId.gripper
                     ):
+                        print(f"message serial: {message.payload.serial}")
                         if message.payload.model == UInt16Field(
                             model
                         ) and message.payload.serial == fields.SerialField(data):

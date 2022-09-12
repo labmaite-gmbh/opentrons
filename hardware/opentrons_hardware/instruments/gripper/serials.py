@@ -28,7 +28,9 @@ def gripper_info_from_serial_string(serialval: str) -> Tuple[int, bytes]:
         raise ValueError(
             f"The serial number {serialval.strip()} is not valid. {SERIAL_FORMAT_MSG}"
         )
+    print(f"Before: Model is {matches.group('model')}")
     model = int(matches.group("model"))
+    print(f"Model is {model}")
 
     return (
         model,
