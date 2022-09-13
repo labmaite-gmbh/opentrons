@@ -17,6 +17,7 @@ from . import heater_shaker
 from . import magnetic_module
 from . import temperature_module
 from . import thermocycler
+from . import calibration
 
 from .command import (
     AbstractCommandImpl,
@@ -202,6 +203,7 @@ from .blow_out import (
     BlowOut,
 )
 
+
 __all__ = [
     # command type unions
     "Command",
@@ -346,4 +348,5 @@ __all__ = [
     "magnetic_module",
     "temperature_module",
     "thermocycler",
+    "calibration",
 ]
