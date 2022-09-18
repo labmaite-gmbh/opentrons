@@ -14,9 +14,11 @@ import { Modal } from '../../molecules/Modal'
 import { DeckThumbnail } from '../../molecules/DeckThumbnail'
 import { PrimaryButton } from '../../atoms/buttons'
 
+import type { RunTimeCommand } from '@opentrons/shared-data'
+
 interface DeckMapModalProps {
   onCloseClick: () => unknown
-  protocolType: any
+  protocolType: RunTimeCommand[]
 }
 
 export function DeckMapModal({
