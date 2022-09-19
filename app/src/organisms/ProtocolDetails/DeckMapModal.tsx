@@ -25,7 +25,7 @@ export function DeckMapModal({
   onCloseClick,
   protocolType,
 }: DeckMapModalProps): JSX.Element {
-  const { t } = useTranslation(['protocol_setup', 'shared'])
+  const { t } = useTranslation(['top_navigation', 'shared'])
   return (
     <Portal level="top">
       <Modal title={t('deck_setup')} onClose={onCloseClick} maxHeight="32rem">
