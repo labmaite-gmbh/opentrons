@@ -6,7 +6,6 @@ from . import heater_shaker
 from . import magnetic_module
 from . import temperature_module
 from . import thermocycler
-from . import calibration
 
 from .set_rail_lights import (
     SetRailLights,
@@ -197,7 +196,6 @@ Command = Union[
     SavePosition,
     SetRailLights,
     TouchTip,
-    # calibration.CalibrationSetUpPosition,
     heater_shaker.WaitForTemperature,
     heater_shaker.SetTargetTemperature,
     heater_shaker.DeactivateHeater,
