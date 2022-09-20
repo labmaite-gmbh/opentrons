@@ -1,17 +1,17 @@
 """Calibration Module protocol commands."""
 
-from .calibration_set_up_position import (
-    CalibrationSetUpPosition,
-    CalibrationSetUpPositionCreate,
-    CalibrationSetUpPositionParams,
-    CalibrationSetUpPositionResult,
-    CalibrationSetUpPositionCommandType,
+from .move_to_location import (
+    MoveToLocation,
+    MoveToLocationCreate,
+    MoveToLocationParams,
+    MoveToLocationResult,
+    MoveToLocationCommandType,
 )
 
 __all__ = [
-    "CalibrationSetUpPosition",
-    "CalibrationSetUpPositionCreate",
-    "CalibrationSetUpPositionParams",
-    "CalibrationSetUpPositionResult",
-    "CalibrationSetUpPositionCommandType",
+    "MoveToLocation",
+    "MoveToLocationCreate",
+    "MoveToLocationParams",
+    "MoveToLocationResult",
+    "MoveToLocationCommandType",
 ]
