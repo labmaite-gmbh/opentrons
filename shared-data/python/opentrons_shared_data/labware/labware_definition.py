@@ -140,9 +140,9 @@ class Dimensions(BaseModel):
     Outer dimensions of a labware
     """
 
-    yDimension: _NonNegativeNumber = Field(...)
-    zDimension: _NonNegativeNumber = Field(...)
-    xDimension: _NonNegativeNumber = Field(...)
+    yDimension: _Number = Field(...)
+    zDimension: _Number = Field(...)
+    xDimension: _Number = Field(...)
 
 
 class WellDefinition(BaseModel):
@@ -160,7 +160,7 @@ class WellDefinition(BaseModel):
         description="y location of center-bottom of well in reference to "
         "left-front-bottom of labware",
     )
-    z: _NonNegativeNumber = Field(
+    z: _Number = Field(
         ...,
         description="z location of center-bottom of well in reference to "
         "left-front-bottom of labware",
