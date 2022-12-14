@@ -35,6 +35,7 @@ def labware_from_paths(
                 try:
                     defn = labware.verify_definition(child.read_bytes())
                 except (ValidationError, JSONDecodeError) as e:
+                    print(e)
                     log.info(f"{child}: invalid labware, ignoring")
                     log.debug(f"{child}: labware invalid because: {str(e)}")
                 else:
